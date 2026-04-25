@@ -1,0 +1,254 @@
+@import "tailwindcss";
+
+/* ─── Design tokens ──────────────────────────────────────────────────────── */
+/* Using @theme (not inline) so CSS vars remain available in component classes */
+@theme {
+  --color-teal:         #00A6A6;
+  --color-teal-light:   #E0F5F5;
+  --color-teal-dark:    #007A7A;
+  --color-amber:        #EFCA08;
+  --color-amber-light:  #FDF6CC;
+  --color-orange:       #F49F0A;
+  --color-orange-light: #FEF0CC;
+  --color-sky:          #BBDEF0;
+  --color-sky-light:    #EDF6FB;
+  --color-ink:          #1A1A1A;
+  --color-parchment:    #F5F0E8;
+
+  --font-serif: Georgia, "Times New Roman", serif;
+  --font-sans:  system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+  --text-display: 2rem;
+  --text-h1:      1.5rem;
+  --text-h2:      1.125rem;
+  --text-body:    0.9375rem;
+  --text-label:   0.75rem;
+
+  --radius-card:   12px;
+  --radius-button: 8px;
+  --radius-input:  8px;
+  --radius-pill:   20px;
+}
+
+/* ─── Base styles ────────────────────────────────────────────────────────── */
+body {
+  font-family: var(--font-sans);
+  font-size: var(--text-body);
+  color: var(--color-ink);
+  background: #ffffff;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-serif);
+  font-weight: 400;
+}
+
+/* ─── Component classes ──────────────────────────────────────────────────── */
+@layer components {
+
+  /* Card — white bg, real shadow, teal top accent */
+  .card {
+    background: #ffffff;
+    border-radius: var(--radius-card);
+    border-top: 3px solid var(--color-teal);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 4px 16px rgba(0, 0, 0, 0.06);
+  }
+
+  /* Buttons */
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--color-teal);
+    color: #ffffff;
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    font-weight: 500;
+    padding: 10px 20px;
+    border-radius: var(--radius-button);
+    border: none;
+    cursor: pointer;
+    transition: background-color 150ms;
+  }
+  .btn-primary:hover { background-color: var(--color-teal-dark); }
+  .btn-primary:focus-visible {
+    outline: 2px solid var(--color-teal);
+    outline-offset: 2px;
+  }
+
+  .btn-accent {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--color-amber);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    font-weight: 500;
+    padding: 10px 20px;
+    border-radius: var(--radius-button);
+    border: none;
+    cursor: pointer;
+    transition: filter 150ms;
+  }
+  .btn-accent:hover { filter: brightness(0.93); }
+  .btn-accent:focus-visible {
+    outline: 2px solid var(--color-amber);
+    outline-offset: 2px;
+  }
+
+  .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #f3f4f6;
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    font-weight: 500;
+    padding: 10px 20px;
+    border-radius: var(--radius-button);
+    border: 1px solid #e2e8f0;
+    cursor: pointer;
+    transition: background-color 150ms;
+  }
+  .btn-secondary:hover { background-color: #e9eaec; }
+
+  .btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: transparent;
+    color: var(--color-teal);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    font-weight: 500;
+    padding: 10px 20px;
+    border-radius: var(--radius-button);
+    border: 1.5px solid var(--color-teal);
+    cursor: pointer;
+    transition: background-color 150ms;
+  }
+  .btn-ghost:hover { background-color: var(--color-teal-light); }
+
+  /* Input — visible border, teal focus */
+  .input {
+    width: 100%;
+    border: 1.5px solid #cbd5e1;
+    border-radius: var(--radius-input);
+    padding: 10px 12px;
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    color: var(--color-ink);
+    background: #ffffff;
+    transition: border-color 150ms, box-shadow 150ms;
+  }
+  .input::placeholder { color: #94a3b8; }
+  .input:focus {
+    outline: none;
+    border-color: var(--color-teal);
+    box-shadow: 0 0 0 3px rgba(0, 166, 166, 0.15);
+  }
+
+  /* Label — uppercase, tracked, readable */
+  .label {
+    font-family: var(--font-sans);
+    font-size: var(--text-label);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #475569;
+  }
+
+  /* Day pill — amber bg, ink text */
+  .day-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--color-amber);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-label);
+    font-weight: 500;
+    padding: 4px 12px;
+    border-radius: var(--radius-pill);
+  }
+
+  /* Tags — pastel fills with dark enough text for legibility */
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    font-family: var(--font-sans);
+    font-size: var(--text-label);
+    font-weight: 500;
+    padding: 3px 10px;
+    border-radius: var(--radius-pill);
+  }
+  .tag-red-meat    { background-color: var(--color-orange-light); color: #9a3412; }
+  .tag-crockpot    { background-color: var(--color-orange-light); color: #9a3412; }
+  .tag-vegetarian  { background-color: var(--color-teal-light);   color: var(--color-teal-dark); }
+  .tag-no-dairy    { background-color: var(--color-sky);          color: #075985; }
+  .tag-gluten-free { background-color: var(--color-amber-light);  color: #92400e; }
+  .tag-freeze      { background-color: var(--color-teal-light);   color: var(--color-teal-dark); }
+  .tag-snack       { background-color: var(--color-parchment);    color: #57534e; }
+  .tag-custom      { background-color: #F1F5F9;                   color: #475569; }
+
+  /* Toggle switch */
+  .toggle-checkbox {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+  .toggle-track {
+    display: block;
+    width: 44px;
+    height: 24px;
+    background-color: #CBD5E1;
+    border-radius: 12px;
+    position: relative;
+    cursor: pointer;
+    transition: background-color 200ms;
+    flex-shrink: 0;
+  }
+  .toggle-track::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 18px;
+    height: 18px;
+    background: #ffffff;
+    border-radius: 50%;
+    transition: transform 200ms;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+  .toggle-checkbox:checked + .toggle-track {
+    background-color: var(--color-teal);
+  }
+  .toggle-checkbox:checked + .toggle-track::after {
+    transform: translateX(20px);
+  }
+
+  /* Grocery checkbox — teal circle, white check */
+  .grocery-checkbox {
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2px solid var(--color-teal);
+    background: #ffffff;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background-color 150ms;
+  }
+  .grocery-checkbox:checked {
+    background-color: var(--color-teal);
+    border-color: var(--color-teal);
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 12 10' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 5l3.5 3.5L11 1' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 10px;
+  }
+}
