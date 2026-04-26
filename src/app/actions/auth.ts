@@ -22,6 +22,20 @@ export async function sendMagicLink(formData: FormData) {
   redirect(`/login?sent=1&email=${encodeURIComponent(email)}`)
 }
 
+export async function signup(formData: FormData) {
+  const supabase = await createClient()
+  const email = formData.get('email') as string
+  const password = formData.get('password') as string
+
+  const { error } = await supabase.auth.signUp({ email, password })
+
+  if (error) {
+    redirect(`/signup?error=${encodeURIComponent(error.message)}`)
+  }
+
+  redirect('/login?sent=1&email=' + encodeURIComponent(email))
+}
+
 export async function logout() {
   const supabase = await createClient()
   await supabase.auth.signOut()
