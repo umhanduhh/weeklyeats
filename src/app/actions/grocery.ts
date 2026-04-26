@@ -48,7 +48,7 @@ export async function generateGroceryList(planId: string, weekStartDate: string)
   const uniqueMeals: { id: string; title: string; ingredients: string }[] = []
 
   for (const slot of slots) {
-    const meal = slot.meals as { id: string; title: string; ingredients: string | null } | null
+    const meal = slot.meals as unknown as { id: string; title: string; ingredients: string | null } | null
     if (!meal || !meal.ingredients?.trim() || seen.has(meal.id)) continue
     seen.add(meal.id)
     uniqueMeals.push(meal as { id: string; title: string; ingredients: string })
