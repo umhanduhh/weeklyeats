@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server'
+import { PRESET_TAGS } from '@/lib/tags'
 
 type FormattedRecipe = {
   ingredients: { text: string }[]
@@ -57,6 +58,38 @@ Rules:
   }
 }
 
+async function suggestTags(title: string, ingredientsRaw: string): Promise<string[]> {
+  if (!title && !ingredientsRaw) return []
+  const tagList = PRESET_TAGS.map(t => `"${t.value}" (${t.label})`).join(', ')
+  const anthropic = new Anthropic()
+  const message = await anthropic.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 256,
+    messages: [
+      {
+        role: 'user',
+        content: `Given this recipe, return a JSON array of applicable tag values from this list: ${tagList}.
+
+Recipe title: ${title}
+Ingredients: ${ingredientsRaw || '(none)'}
+
+Rules:
+- Only include tags that clearly apply
+- Return an empty array if none apply
+- Return ONLY a JSON array like ["vegetarian", "salad"], no explanation`,
+      },
+    ],
+  })
+  const text = message.content[0].type === 'text' ? message.content[0].text : '[]'
+  const jsonText = text.replace(/^```(?:json)?\s*/m, '').replace(/\s*```\s*$/m, '').trim()
+  try {
+    const parsed = JSON.parse(jsonText)
+    return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === 'string') : []
+  } catch {
+    return []
+  }
+}
+
 export async function createMeal(formData: FormData) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -72,18 +105,24 @@ export async function createMeal(formData: FormData) {
 
   let ingredients: { text: string }[] = []
   let instructions = instructionsRaw
+  let autoTags: string[] = []
 
   try {
-    const formatted = await formatRecipe(ingredientsRaw, instructionsRaw)
+    const [formatted, suggested] = await Promise.all([
+      formatRecipe(ingredientsRaw, instructionsRaw),
+      suggestTags(title, ingredientsRaw),
+    ])
     ingredients = formatted.ingredients
     instructions = formatted.instructions.join('\n')
+    autoTags = suggested
   } catch (e) {
     console.error('AI formatting failed, using fallback:', e)
-    // Fall back: split by newline, or by comma if no newlines present
     const lines = ingredientsRaw.split('\n').map(l => l.trim()).filter(Boolean)
     const raw = lines.length > 1 ? lines : ingredientsRaw.split(',').map(l => l.trim()).filter(Boolean)
     ingredients = raw.map(text => ({ text }))
   }
+
+  const mergedTags = Array.from(new Set([...tags, ...autoTags]))
 
   const { error } = await supabase.from('meals').insert({
     user_id: user.id,
@@ -91,7 +130,7 @@ export async function createMeal(formData: FormData) {
     source_url: sourceUrl,
     ingredients,
     instructions,
-    tags: tags.length > 0 ? tags : null,
+    tags: mergedTags.length > 0 ? mergedTags : null,
     is_public: isPublic,
   })
 
@@ -138,4 +177,24 @@ export async function copyMealToCollection(formData: FormData) {
   }
 
   redirect('/meals?copied=1')
+}
+
+export async function deleteMeal(formData: FormData) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const mealId = formData.get('meal_id') as string
+
+  const { error } = await supabase
+    .from('meals')
+    .delete()
+    .eq('id', mealId)
+    .eq('user_id', user.id)
+
+  if (error) {
+    redirect(`/meals?error=${encodeURIComponent(error.message)}`)
+  }
+
+  redirect('/meals')
 }

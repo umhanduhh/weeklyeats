@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { AppHeader } from '@/components/AppHeader'
 import { MealCard } from '@/components/MealCard'
 import { copyMealToCollection } from '@/app/actions/meals'
+import { DeleteMealButton } from '@/components/DeleteMealButton'
 
 type SearchParams = Promise<{ tab?: string; copied?: string; error?: string }>
 
@@ -97,7 +98,7 @@ export default async function MealsPage({ searchParams }: { searchParams: Search
                 </Link>
               </div>
             ) : (
-              myMeals.map(meal => <MealCard key={meal.id} meal={meal} />)
+              myMeals.map(meal => <MealCard key={meal.id} meal={meal} action={<DeleteMealButton mealId={meal.id} />} />)
             )}
           </div>
         )}
