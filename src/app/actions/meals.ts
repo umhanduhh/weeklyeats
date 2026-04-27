@@ -99,6 +99,7 @@ export async function createMeal(formData: FormData) {
   const sourceUrl = (formData.get('source_url') as string).trim() || null
   const ingredientsRaw = (formData.get('ingredients') as string).trim()
   const instructionsRaw = (formData.get('instructions') as string).trim()
+  const notes = ((formData.get('notes') as string) ?? '').trim() || null
   const tags = formData.getAll('tags') as string[]
   const isPublic = formData.get('is_public') === 'on'
   const after = formData.get('after') as string
@@ -130,6 +131,7 @@ export async function createMeal(formData: FormData) {
     source_url: sourceUrl,
     ingredients,
     instructions,
+    notes,
     tags: mergedTags.length > 0 ? mergedTags : null,
     is_public: isPublic,
   })
@@ -142,6 +144,57 @@ export async function createMeal(formData: FormData) {
     redirect('/meals/new?saved=1')
   }
   redirect('/meals')
+}
+
+export async function updateMeal(formData: FormData) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const mealId = formData.get('meal_id') as string
+  const title = (formData.get('title') as string).trim()
+  const sourceUrl = (formData.get('source_url') as string).trim() || null
+  const ingredientsRaw = (formData.get('ingredients') as string).trim()
+  const instructionsRaw = (formData.get('instructions') as string).trim()
+  const notes = ((formData.get('notes') as string) ?? '').trim() || null
+  const tags = formData.getAll('tags') as string[]
+  const isPublic = formData.get('is_public') === 'on'
+
+  // Edit mode skips AI re-formatting — the user is making targeted tweaks.
+  // Store ingredients in the same { text } shape createMeal produces so MealCard
+  // renders consistently.
+  const ingredients = ingredientsRaw
+    ? ingredientsRaw.split('\n').map(l => l.trim()).filter(Boolean).map(text => ({ text }))
+    : []
+
+  // Auto-tag is still cheap enough to run; merges with whatever the user picked.
+  let autoTags: string[] = []
+  try {
+    autoTags = await suggestTags(title, ingredientsRaw)
+  } catch (e) {
+    console.error('Auto-tag failed on edit, skipping:', e)
+  }
+  const mergedTags = Array.from(new Set([...tags, ...autoTags]))
+
+  const { error } = await supabase
+    .from('meals')
+    .update({
+      title,
+      source_url: sourceUrl,
+      ingredients,
+      instructions: instructionsRaw,
+      notes,
+      tags: mergedTags.length > 0 ? mergedTags : null,
+      is_public: isPublic,
+    })
+    .eq('id', mealId)
+    .eq('user_id', user.id)
+
+  if (error) {
+    redirect(`/meals/${mealId}/edit?error=${encodeURIComponent(error.message)}`)
+  }
+
+  redirect('/meals?updated=1')
 }
 
 export async function copyMealToCollection(formData: FormData) {

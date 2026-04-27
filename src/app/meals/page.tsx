@@ -4,12 +4,12 @@ import { createClient } from '@/lib/supabase/server'
 import { AppHeader } from '@/components/AppHeader'
 import { MealCard } from '@/components/MealCard'
 import { copyMealToCollection } from '@/app/actions/meals'
-import { DeleteMealButton } from '@/components/DeleteMealButton'
+import { EditMealLink } from '@/components/EditMealLink'
 
-type SearchParams = Promise<{ tab?: string; copied?: string; error?: string }>
+type SearchParams = Promise<{ tab?: string; copied?: string; updated?: string; error?: string }>
 
 export default async function MealsPage({ searchParams }: { searchParams: SearchParams }) {
-  const { tab = 'mine', copied, error } = await searchParams
+  const { tab = 'mine', copied, updated, error } = await searchParams
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -18,7 +18,7 @@ export default async function MealsPage({ searchParams }: { searchParams: Search
   const [myMealsRes, communityMealsRes] = await Promise.all([
     supabase
       .from('meals')
-      .select('id, title, source_url, tags, ingredients, instructions')
+      .select('id, title, source_url, tags, ingredients, instructions, notes')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false }),
     supabase
@@ -41,6 +41,11 @@ export default async function MealsPage({ searchParams }: { searchParams: Search
         {copied && (
           <div className="mb-4 rounded-lg px-4 py-3 text-sm font-medium" style={{ background: '#E0F5F5', color: '#007A7A' }}>
             Meal added to your collection.
+          </div>
+        )}
+        {updated && (
+          <div className="mb-4 rounded-lg px-4 py-3 text-sm font-medium" style={{ background: '#E0F5F5', color: '#007A7A' }}>
+            Meal updated.
           </div>
         )}
         {error && (
@@ -98,7 +103,7 @@ export default async function MealsPage({ searchParams }: { searchParams: Search
                 </Link>
               </div>
             ) : (
-              myMeals.map(meal => <MealCard key={meal.id} meal={meal} action={<DeleteMealButton mealId={meal.id} />} />)
+              myMeals.map(meal => <MealCard key={meal.id} meal={meal} action={<EditMealLink mealId={meal.id} />} />)
             )}
           </div>
         )}
