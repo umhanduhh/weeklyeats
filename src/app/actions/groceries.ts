@@ -133,32 +133,58 @@ ${allIngredients.join('\n')}`,
     .eq('id', planId)
     .single()
 
-  // Delete any existing list for this plan
-  await supabase
+  // Find or create the list, then swap items: insert the new batch first and
+  // only delete the old rows once that succeeds, so a mid-flight failure can't
+  // leave the user with an empty list.
+  const { data: existing } = await supabase
     .from('grocery_lists')
-    .delete()
-    .eq('plan_id', planId)
-
-  // Create new list
-  const { data: list, error: listError } = await supabase
-    .from('grocery_lists')
-    .insert({ plan_id: planId, user_id: user.id, week_start_date: plan?.week_start_date })
     .select('id')
-    .single()
+    .eq('plan_id', planId)
+    .maybeSingle()
 
-  if (listError || !list) return { error: `Could not create grocery list: ${listError?.message ?? 'unknown error'}` }
+  let listId: string
+  if (existing) {
+    listId = existing.id
+  } else {
+    const { data: created, error: listError } = await supabase
+      .from('grocery_lists')
+      .insert({ plan_id: planId, user_id: user.id, week_start_date: plan?.week_start_date })
+      .select('id')
+      .single()
+    if (listError || !created) return { error: `Could not create grocery list: ${listError?.message ?? 'unknown error'}` }
+    listId = created.id
+  }
 
-  // Insert items
+  // Snapshot existing item ids before insert so we can delete exactly those on success.
+  const { data: oldItems } = await supabase
+    .from('grocery_items')
+    .select('id')
+    .eq('list_id', listId)
+  const oldIds = (oldItems ?? []).map(r => r.id)
+  const offset = oldIds.length // keep positions distinct from old rows during the swap
+
   const { error: itemsError } = await supabase.from('grocery_items').insert(
     parsed.map((item, i) => ({
-      list_id: list.id,
+      list_id: listId,
       ingredient: item.ingredient,
       category: item.category ?? 'Other',
-      position: i,
+      position: offset + i,
     }))
   )
 
   if (itemsError) return { error: `Could not save items: ${itemsError.message}` }
+
+  if (oldIds.length > 0) {
+    await supabase.from('grocery_items').delete().in('id', oldIds)
+  }
+  // Renumber the kept items to start at 0 for stable ordering.
+  await Promise.all(
+    parsed.map((_, i) =>
+      supabase.from('grocery_items').update({ position: i })
+        .eq('list_id', listId)
+        .eq('position', offset + i)
+    )
+  )
 
   revalidatePath('/grocery')
   return {}
@@ -171,6 +197,19 @@ ${allIngredients.join('\n')}`,
 
 export async function parseAndAddItems(listId: string, rawText: string): Promise<{ items?: GroceryItem[]; error?: string }> {
   if (!rawText.trim()) return { error: 'Nothing to add.' }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  // Verify the caller owns this list before spending an Anthropic call on it.
+  const { data: list } = await supabase
+    .from('grocery_lists')
+    .select('id')
+    .eq('id', listId)
+    .eq('user_id', user.id)
+    .maybeSingle()
+  if (!list) return { error: 'List not found' }
 
   const anthropic = new Anthropic()
   const message = await anthropic.messages.create({
@@ -212,7 +251,6 @@ ${rawText}`,
     return { error: 'Could not parse your items. Try again.' }
   }
 
-  const supabase = await createClient()
   const { data, error } = await supabase
     .from('grocery_items')
     .insert(parsed.map((item, i) => ({

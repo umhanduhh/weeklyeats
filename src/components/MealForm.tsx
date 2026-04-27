@@ -40,7 +40,13 @@ export function MealForm() {
     setPhotoError('')
     startPhotoTransition(async () => {
       const buffer = await photoFile.arrayBuffer()
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)))
+      const bytes = new Uint8Array(buffer)
+      let bin = ''
+      const CHUNK = 0x8000
+      for (let i = 0; i < bytes.length; i += CHUNK) {
+        bin += String.fromCharCode(...bytes.subarray(i, i + CHUNK))
+      }
+      const base64 = btoa(bin)
       const mediaType = photoFile.type as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
       const result = await parseRecipeFromImage(base64, mediaType)
       if ('error' in result) {

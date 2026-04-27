@@ -1,6 +1,7 @@
 'use server'
 
 import Anthropic from '@anthropic-ai/sdk'
+import { createClient } from '@/lib/supabase/server'
 
 type ImportResult =
   | { title: string; ingredients: string; instructions: string }
@@ -8,7 +9,16 @@ type ImportResult =
 
 type ImageMediaType = 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
 
+async function requireUser(): Promise<{ error: string } | null> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Please sign in to use this feature.' }
+  return null
+}
+
 export async function parseRecipeFromUrl(url: string): Promise<ImportResult> {
+  const authError = await requireUser()
+  if (authError) return authError
   // Fetch the page HTML
   let html: string
   try {
@@ -84,6 +94,8 @@ export async function parseRecipeFromImage(
   base64: string,
   mediaType: ImageMediaType,
 ): Promise<ImportResult> {
+  const authError = await requireUser()
+  if (authError) return authError
   const anthropic = new Anthropic()
   const message = await anthropic.messages.create({
     model: 'claude-haiku-4-5-20251001',
