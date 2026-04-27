@@ -1,9 +1,24 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { useFormStatus } from 'react-dom'
 import { createMeal } from '@/app/actions/meals'
 import { parseRecipeFromUrl, parseRecipeFromImage } from '@/app/actions/import'
 import { TagSelector } from '@/components/TagSelector'
+
+function SubmitButtons() {
+  const { pending } = useFormStatus()
+  return (
+    <div className="flex gap-3 pt-1">
+      <button name="after" value="list" type="submit" disabled={pending} className="btn-primary flex-1">
+        {pending ? 'Saving…' : 'Save meal'}
+      </button>
+      <button name="after" value="new" type="submit" disabled={pending} className="btn-secondary flex-1">
+        Save &amp; add another
+      </button>
+    </div>
+  )
+}
 
 export function MealForm() {
   const [title, setTitle] = useState('')
@@ -205,14 +220,7 @@ export function MealForm() {
         </div>
 
         {/* Actions */}
-        <div className="flex gap-3 pt-1">
-          <button name="after" value="list" type="submit" className="btn-primary flex-1">
-            Save meal
-          </button>
-          <button name="after" value="new" type="submit" className="btn-secondary flex-1">
-            Save &amp; add another
-          </button>
-        </div>
+        <SubmitButtons />
 
       </form>
     </div>
