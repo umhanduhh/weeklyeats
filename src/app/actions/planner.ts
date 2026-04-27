@@ -11,25 +11,26 @@ export async function getOrCreatePlan(weekStartDate: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // Try to find existing plan
-  const { data: existing } = await supabase
+  // Upsert against the (user_id, week_start_date) unique index so concurrent
+  // requests for the same week can't create duplicate plans.
+  const { data: plan } = await supabase
     .from('weekly_plans')
+    .upsert(
+      { user_id: user.id, week_start_date: weekStartDate },
+      { onConflict: 'user_id,week_start_date', ignoreDuplicates: false }
+    )
     .select('id')
-    .eq('user_id', user.id)
-    .eq('week_start_date', weekStartDate)
     .single()
 
-  let planId = existing?.id
+  const planId = plan!.id
 
-  if (!planId) {
-    const { data: created } = await supabase
-      .from('weekly_plans')
-      .insert({ user_id: user.id, week_start_date: weekStartDate })
-      .select('id')
-      .single()
-    planId = created!.id
+  // Create the 14 slots only if this plan has none yet (i.e. first time we saw it).
+  const { count } = await supabase
+    .from('weekly_plan_slots')
+    .select('id', { count: 'exact', head: true })
+    .eq('plan_id', planId)
 
-    // Create 14 slots: dinner + other for each of 7 days
+  if (!count) {
     await supabase.from('weekly_plan_slots').insert(
       [0, 1, 2, 3, 4, 5, 6].flatMap(day => [
         { plan_id: planId, day_of_week: day, meal_type: 'dinner' },
@@ -42,11 +43,24 @@ export async function getOrCreatePlan(weekStartDate: string) {
   const { data: slots } = await supabase
     .from('weekly_plan_slots')
     .select('id, day_of_week, meal_type, meal_id, note, constraint_tags, meals(id, title, tags, source_url)')
-    .eq('plan_id', planId!)
+    .eq('plan_id', planId)
     .order('day_of_week')
     .order('meal_type')
 
-  return { planId: planId!, slots: slots ?? [] }
+  return { planId, slots: slots ?? [] }
+}
+
+// Defense-in-depth: confirm the slot's parent plan belongs to the caller before
+// any update. RLS should already block cross-user writes, but this avoids
+// trusting a slot id from the client outright.
+async function assertSlotOwned(supabase: Awaited<ReturnType<typeof createClient>>, slotId: string, userId: string) {
+  const { data } = await supabase
+    .from('weekly_plan_slots')
+    .select('id, weekly_plans!inner(user_id)')
+    .eq('id', slotId)
+    .eq('weekly_plans.user_id', userId)
+    .maybeSingle()
+  return !!data
 }
 
 // ─── Assign a meal to a slot ─────────────────────────────────────────────────
@@ -55,6 +69,7 @@ export async function assignMealToSlot(slotId: string, mealId: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return
+  if (!(await assertSlotOwned(supabase, slotId, user.id))) return
 
   await supabase
     .from('weekly_plan_slots')
@@ -77,6 +92,7 @@ export async function setSlotNote(slotId: string, note: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return
+  if (!(await assertSlotOwned(supabase, slotId, user.id))) return
 
   await supabase
     .from('weekly_plan_slots')
@@ -92,6 +108,7 @@ export async function setSlotConstraints(slotId: string, tags: string[]) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return
+  if (!(await assertSlotOwned(supabase, slotId, user.id))) return
 
   await supabase
     .from('weekly_plan_slots')
@@ -107,6 +124,7 @@ export async function clearSlot(slotId: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return
+  if (!(await assertSlotOwned(supabase, slotId, user.id))) return
 
   await supabase
     .from('weekly_plan_slots')
