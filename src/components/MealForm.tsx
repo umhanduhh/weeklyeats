@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { createMeal } from '@/app/actions/meals'
-import { parseRecipeFromUrl } from '@/app/actions/import'
+import { parseRecipeFromUrl, parseRecipeFromImage } from '@/app/actions/import'
 import { TagSelector } from '@/components/TagSelector'
 
 export function MealForm() {
@@ -11,10 +11,31 @@ export function MealForm() {
   const [ingredients, setIngredients] = useState('')
   const [instructions, setInstructions] = useState('')
   const [importError, setImportError] = useState('')
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [photoError, setPhotoError] = useState('')
   const [isPending, startTransition] = useTransition()
+  const [isPhotoPending, startPhotoTransition] = useTransition()
 
   function isValidUrl(s: string) {
     try { new URL(s); return true } catch { return false }
+  }
+
+  function handlePhotoImport() {
+    if (!photoFile) return
+    setPhotoError('')
+    startPhotoTransition(async () => {
+      const buffer = await photoFile.arrayBuffer()
+      const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)))
+      const mediaType = photoFile.type as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
+      const result = await parseRecipeFromImage(base64, mediaType)
+      if ('error' in result) {
+        setPhotoError(result.error)
+      } else {
+        if (result.title) setTitle(result.title)
+        setIngredients(result.ingredients)
+        setInstructions(result.instructions)
+      }
+    })
   }
 
   function handleImport() {
@@ -66,6 +87,42 @@ export function MealForm() {
             <p className="mt-2 text-sm" style={{ color: '#00A6A6' }}>
               Fetching recipe — this takes a few seconds…
             </p>
+          )}
+        </div>
+
+        {/* Photo import */}
+        <div>
+          <label className="label block mb-2">Import from photo</label>
+          <div className="flex gap-2">
+            <label
+              className="input flex items-center gap-2 cursor-pointer"
+              style={{ flex: 1, overflow: 'hidden' }}
+            >
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="sr-only"
+                onChange={e => { setPhotoFile(e.target.files?.[0] ?? null); setPhotoError('') }}
+              />
+              <span style={{ color: photoFile ? '#1A1A1A' : '#94A3B8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {photoFile ? photoFile.name : 'Choose image…'}
+              </span>
+            </label>
+            <button
+              type="button"
+              onClick={handlePhotoImport}
+              disabled={!photoFile || isPhotoPending}
+              className="btn-secondary"
+              style={{ padding: '10px 16px', fontSize: '0.875rem', whiteSpace: 'nowrap', flexShrink: 0 }}
+            >
+              {isPhotoPending ? 'Reading…' : 'Import'}
+            </button>
+          </div>
+          {photoError && (
+            <p className="mt-2 text-sm" style={{ color: '#991B1B' }}>{photoError}</p>
+          )}
+          {isPhotoPending && (
+            <p className="mt-2 text-sm" style={{ color: '#00A6A6' }}>Reading recipe from photo…</p>
           )}
         </div>
 
