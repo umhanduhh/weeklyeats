@@ -192,6 +192,8 @@ h1, h2, h3, h4, h5, h6 {
   .tag-gluten-free { background-color: var(--color-amber-light);  color: #92400e; }
   .tag-freeze      { background-color: var(--color-teal-light);   color: var(--color-teal-dark); }
   .tag-snack       { background-color: var(--color-parchment);    color: #57534e; }
+  .tag-salad       { background-color: #DCFCE7;                   color: #166534; }
+  .tag-soup        { background-color: var(--color-orange-light);  color: #c2410c; }
   .tag-custom      { background-color: #F1F5F9;                   color: #475569; }
 
   /* Toggle switch */
