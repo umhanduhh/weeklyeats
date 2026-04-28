@@ -3,7 +3,6 @@ import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { AppHeader } from '@/components/AppHeader'
 import { MealForm } from '@/components/MealForm'
-import { DeleteMealButton } from '@/components/DeleteMealButton'
 
 type Params = Promise<{ id: string }>
 type SearchParams = Promise<{ error?: string }>
@@ -50,16 +49,13 @@ export default async function EditMealPage({
       <AppHeader email={user.email!} active="meals" />
 
       <div className="max-w-xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <Link href="/meals" style={{ color: '#00A6A6', fontSize: '0.9375rem', textDecoration: 'none' }}>
-              ← Meals
-            </Link>
-            <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '1.5rem', fontWeight: 400, color: '#1A1A1A' }}>
-              Edit meal
-            </h1>
-          </div>
-          <DeleteMealButton mealId={meal.id} />
+        <div className="flex items-center gap-3 mb-6">
+          <Link href="/meals" style={{ color: '#00A6A6', fontSize: '0.9375rem', textDecoration: 'none' }}>
+            ← Meals
+          </Link>
+          <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '1.5rem', fontWeight: 400, color: '#1A1A1A' }}>
+            Edit meal
+          </h1>
         </div>
 
         {error && (

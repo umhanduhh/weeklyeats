@@ -5,6 +5,7 @@ import { useFormStatus } from 'react-dom'
 import { createMeal, updateMeal } from '@/app/actions/meals'
 import { parseRecipeFromUrl, parseRecipeFromImage } from '@/app/actions/import'
 import { TagSelector } from '@/components/TagSelector'
+import { DeleteMealButton } from '@/components/DeleteMealButton'
 
 function CreateButtons() {
   const { pending } = useFormStatus()
@@ -57,6 +58,7 @@ export function MealForm({
   const [ingredients, setIngredients] = useState(initialIngredients)
   const [instructions, setInstructions] = useState(initialInstructions)
   const [notes, setNotes] = useState(initialNotes)
+  const [isPublic, setIsPublic] = useState(initialIsPublic)
   const [importError, setImportError] = useState('')
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoError, setPhotoError] = useState('')
@@ -297,13 +299,23 @@ export function MealForm({
             </p>
           </div>
           <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
-            <input type="checkbox" name="is_public" defaultChecked={initialIsPublic} className="toggle-checkbox" />
+            <input
+              type="checkbox"
+              name="is_public"
+              checked={isPublic}
+              onChange={e => setIsPublic(e.target.checked)}
+              className="toggle-checkbox"
+            />
             <span className="toggle-track" />
           </label>
         </div>
 
         {/* Actions */}
         {isEdit ? <UpdateButton /> : <CreateButtons />}
+
+        {isEdit && mealId && (
+          <DeleteMealButton mealId={mealId} isPublic={isPublic} />
+        )}
 
       </form>
     </div>
