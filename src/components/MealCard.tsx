@@ -18,6 +18,7 @@ export type Meal = {
   tags: string[] | null
   ingredients: Ingredient[] | null
   instructions: string | null
+  notes?: string | null
 }
 
 type Props = {
@@ -46,7 +47,7 @@ function formatInstructions(instructions: string): string[] {
 export function MealCard({ meal, action }: Props) {
   const [open, setOpen] = useState(false)
 
-  const hasContent = (meal.ingredients && meal.ingredients.length > 0) || meal.instructions
+  const hasContent = (meal.ingredients && meal.ingredients.length > 0) || meal.instructions || meal.notes
 
   return (
     <div className="card overflow-hidden">
@@ -157,6 +158,25 @@ export function MealCard({ meal, action }: Props) {
                       </li>
                     ))}
                   </ol>
+                </div>
+              )}
+
+              {/* Notes — verbatim, no formatting */}
+              {meal.notes && (
+                <div>
+                  <p className="label mb-3">Notes</p>
+                  <p
+                    style={{
+                      fontSize: '0.9375rem',
+                      color: '#1A1A1A',
+                      whiteSpace: 'pre-wrap',
+                      background: '#FDF6CC',
+                      padding: '12px 14px',
+                      borderRadius: '8px',
+                    }}
+                  >
+                    {meal.notes}
+                  </p>
                 </div>
               )}
 
