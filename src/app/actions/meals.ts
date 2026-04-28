@@ -239,14 +239,36 @@ export async function deleteMeal(formData: FormData) {
 
   const mealId = formData.get('meal_id') as string
 
-  const { error } = await supabase
+  // Look up the meal first so we can decide between a hard delete (private
+  // recipes) and a soft delete that orphans ownership but keeps the row
+  // visible in Community (public recipes — other members may have saved them).
+  const { data: meal } = await supabase
     .from('meals')
-    .delete()
+    .select('is_public')
     .eq('id', mealId)
     .eq('user_id', user.id)
+    .maybeSingle()
 
-  if (error) {
-    redirect(`/meals?error=${encodeURIComponent(error.message)}`)
+  if (!meal) {
+    // Either it doesn't exist or isn't ours — silently bail so this can't be
+    // used to probe other users' meal ids.
+    redirect('/meals')
+  }
+
+  if (meal.is_public) {
+    const { error } = await supabase.rpc('soft_delete_meal', { meal_id: mealId })
+    if (error) {
+      redirect(`/meals?error=${encodeURIComponent(error.message)}`)
+    }
+  } else {
+    const { error } = await supabase
+      .from('meals')
+      .delete()
+      .eq('id', mealId)
+      .eq('user_id', user.id)
+    if (error) {
+      redirect(`/meals?error=${encodeURIComponent(error.message)}`)
+    }
   }
 
   redirect('/meals')

@@ -3,11 +3,19 @@
 import { useTransition } from 'react'
 import { deleteMeal } from '@/app/actions/meals'
 
-export function DeleteMealButton({ mealId }: { mealId: string }) {
+type Props = {
+  mealId: string
+  isPublic?: boolean
+}
+
+export function DeleteMealButton({ mealId, isPublic = false }: Props) {
   const [isPending, startTransition] = useTransition()
 
   function handleClick() {
-    if (!confirm('Delete this meal? This can\'t be undone.')) return
+    const message = isPublic
+      ? 'Remove this recipe from your collection? It will stay available in the Community feed for others.'
+      : 'Delete this recipe? This can\'t be undone.'
+    if (!confirm(message)) return
     const formData = new FormData()
     formData.set('meal_id', mealId)
     startTransition(() => deleteMeal(formData))
@@ -15,27 +23,26 @@ export function DeleteMealButton({ mealId }: { mealId: string }) {
 
   return (
     <button
+      type="button"
       onClick={handleClick}
       disabled={isPending}
-      title="Delete meal"
       style={{
-        width: '32px',
-        height: '32px',
-        borderRadius: '50%',
-        background: '#FEF2F2',
+        width: '100%',
+        background: 'none',
         color: '#991B1B',
         border: 'none',
-        fontSize: '1rem',
+        padding: '8px 12px',
+        fontSize: '0.875rem',
+        fontWeight: 500,
         cursor: isPending ? 'default' : 'pointer',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        lineHeight: 1,
-        flexShrink: 0,
         opacity: isPending ? 0.5 : 1,
+        textDecoration: 'underline',
+        textUnderlineOffset: '3px',
       }}
     >
-      ×
+      {isPending
+        ? (isPublic ? 'Removing…' : 'Deleting…')
+        : (isPublic ? 'Remove from my collection' : 'Delete this recipe')}
     </button>
   )
 }
