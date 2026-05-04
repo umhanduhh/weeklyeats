@@ -90,12 +90,26 @@ ${text}`,
   }
 }
 
-export async function parseRecipeFromImage(
-  base64: string,
-  mediaType: ImageMediaType,
-): Promise<ImportResult> {
+export async function parseRecipeFromImage(formData: FormData): Promise<ImportResult> {
   const authError = await requireUser()
   if (authError) return authError
+
+  // Take the file from FormData rather than a base64 string arg. Server Actions
+  // encode plain string arguments through React's Flight protocol, which chokes
+  // on multi-MB strings ("Maximum array nesting exceeded"). FormData/File is
+  // streamed as a raw blob and bypasses Flight encoding entirely.
+  const file = formData.get('image')
+  if (!(file instanceof File) || file.size === 0) {
+    return { error: 'No image was uploaded.' }
+  }
+  const ALLOWED = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
+  if (!ALLOWED.has(file.type)) {
+    return { error: 'Unsupported image format. Use JPG, PNG, GIF, or WEBP.' }
+  }
+  const mediaType = file.type as ImageMediaType
+  const buffer = await file.arrayBuffer()
+  const base64 = Buffer.from(buffer).toString('base64')
+
   const anthropic = new Anthropic()
   const message = await anthropic.messages.create({
     model: 'claude-haiku-4-5-20251001',
