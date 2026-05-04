@@ -8,6 +8,52 @@ import { EditMealLink } from '@/components/EditMealLink'
 
 type SearchParams = Promise<{ tab?: string; copied?: string; updated?: string; error?: string }>
 
+// Some legacy rows store ingredients in shapes other than `[{text: string}]`
+// (nested arrays from old import paths, raw strings, etc.). Anything we hand
+// across the RSC boundary must be a flat, predictable structure or React will
+// refuse to serialize it ("Maximum array nesting exceeded"). Coerce here.
+function sanitizeIngredients(value: unknown): { text: string }[] {
+  const out: { text: string }[] = []
+  function walk(v: unknown, depth: number) {
+    if (depth > 3) return
+    if (Array.isArray(v)) {
+      for (const item of v) walk(item, depth + 1)
+      return
+    }
+    if (typeof v === 'string') {
+      const trimmed = v.trim()
+      if (trimmed) out.push({ text: trimmed })
+      return
+    }
+    if (v && typeof v === 'object') {
+      const o = v as { text?: unknown; name?: unknown; quantity?: unknown; unit?: unknown }
+      if (typeof o.text === 'string' && o.text.trim()) {
+        out.push({ text: o.text.trim() })
+        return
+      }
+      const parts = [o.quantity, o.unit, o.name].filter(p => typeof p === 'string' && p) as string[]
+      if (parts.length > 0) out.push({ text: parts.join(' ') })
+    }
+  }
+  walk(value, 0)
+  return out
+}
+
+type RawMealRow = {
+  id: string
+  title: string
+  source_url: string | null
+  tags: string[] | null
+  ingredients: unknown
+  instructions: string | null
+  notes?: string | null
+  user_id?: string
+}
+
+function normalizeMeal(m: RawMealRow) {
+  return { ...m, ingredients: sanitizeIngredients(m.ingredients) }
+}
+
 export default async function MealsPage({ searchParams }: { searchParams: SearchParams }) {
   const { tab = 'mine', copied, updated, error } = await searchParams
 
@@ -28,8 +74,8 @@ export default async function MealsPage({ searchParams }: { searchParams: Search
       .order('created_at', { ascending: false }),
   ])
 
-  const myMeals = myMealsRes.data ?? []
-  const communityMeals = communityMealsRes.data ?? []
+  const myMeals = (myMealsRes.data ?? []).map(normalizeMeal)
+  const communityMeals = (communityMealsRes.data ?? []).map(normalizeMeal)
 
   return (
     <div className="min-h-screen" style={{ background: '#F8FAFB' }}>
