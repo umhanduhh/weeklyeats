@@ -70,26 +70,50 @@ export function MealForm({
     try { new URL(s); return true } catch { return false }
   }
 
+  // Downscale and re-encode the image before sending so we don't ship a 10 MB
+  // phone photo through a server action (Next.js caps server-action bodies, and
+  // Anthropic doesn't need that resolution to read text).
+  async function downscaleToJpegBase64(file: File, maxEdge = 1600, quality = 0.85): Promise<string> {
+    const bitmap = await createImageBitmap(file)
+    const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height))
+    const w = Math.round(bitmap.width * scale)
+    const h = Math.round(bitmap.height * scale)
+    const canvas = document.createElement('canvas')
+    canvas.width = w
+    canvas.height = h
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('Could not prepare image for upload.')
+    ctx.drawImage(bitmap, 0, 0, w, h)
+    const blob: Blob | null = await new Promise(resolve =>
+      canvas.toBlob(resolve, 'image/jpeg', quality)
+    )
+    if (!blob) throw new Error('Could not encode image.')
+    const buffer = await blob.arrayBuffer()
+    const bytes = new Uint8Array(buffer)
+    let bin = ''
+    const CHUNK = 0x8000
+    for (let i = 0; i < bytes.length; i += CHUNK) {
+      bin += String.fromCharCode(...bytes.subarray(i, i + CHUNK))
+    }
+    return btoa(bin)
+  }
+
   function handlePhotoImport() {
     if (!photoFile) return
     setPhotoError('')
     startPhotoTransition(async () => {
-      const buffer = await photoFile.arrayBuffer()
-      const bytes = new Uint8Array(buffer)
-      let bin = ''
-      const CHUNK = 0x8000
-      for (let i = 0; i < bytes.length; i += CHUNK) {
-        bin += String.fromCharCode(...bytes.subarray(i, i + CHUNK))
-      }
-      const base64 = btoa(bin)
-      const mediaType = photoFile.type as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
-      const result = await parseRecipeFromImage(base64, mediaType)
-      if ('error' in result) {
-        setPhotoError(result.error)
-      } else {
-        if (result.title) setTitle(result.title)
-        setIngredients(result.ingredients)
-        setInstructions(result.instructions)
+      try {
+        const base64 = await downscaleToJpegBase64(photoFile)
+        const result = await parseRecipeFromImage(base64, 'image/jpeg')
+        if ('error' in result) {
+          setPhotoError(result.error)
+        } else {
+          if (result.title) setTitle(result.title)
+          setIngredients(result.ingredients)
+          setInstructions(result.instructions)
+        }
+      } catch (e) {
+        setPhotoError(e instanceof Error ? e.message : 'Something went wrong reading that image. Try a different photo.')
       }
     })
   }
