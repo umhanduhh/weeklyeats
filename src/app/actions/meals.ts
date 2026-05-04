@@ -52,9 +52,35 @@ Rules:
   const jsonText = text.replace(/^```(?:json)?\s*/m, '').replace(/\s*```\s*$/m, '').trim()
   const parsed = JSON.parse(jsonText)
 
+  // Claude occasionally returns nested objects (recipe sections like
+  // "for the sauce") instead of flat strings. Coerce everything to a flat
+  // string array so we never write a non-string into ingredients.text — the
+  // RSC encoder refuses to serialize those rows on read.
+  const flatIngredients: string[] = []
+  function flatten(v: unknown) {
+    if (typeof v === 'string') {
+      const trimmed = v.trim()
+      if (trimmed) flatIngredients.push(trimmed)
+      return
+    }
+    if (Array.isArray(v)) { v.forEach(flatten); return }
+    if (v && typeof v === 'object') {
+      // Common section shapes Claude produces: {section, items}, {name, items}, {text}
+      const o = v as Record<string, unknown>
+      if (typeof o.text === 'string') { flatten(o.text); return }
+      if (Array.isArray(o.items)) { flatten(o.items); return }
+      if (Array.isArray(o.ingredients)) { flatten(o.ingredients); return }
+    }
+  }
+  flatten(parsed.ingredients)
+
+  const flatInstructions: string[] = Array.isArray(parsed.instructions)
+    ? parsed.instructions.filter((s: unknown): s is string => typeof s === 'string')
+    : []
+
   return {
-    ingredients: (parsed.ingredients as string[]).map((t: string) => ({ text: t })),
-    instructions: parsed.instructions as string[],
+    ingredients: flatIngredients.map(t => ({ text: t })),
+    instructions: flatInstructions,
   }
 }
 
@@ -125,11 +151,17 @@ export async function createMeal(formData: FormData) {
 
   const mergedTags = Array.from(new Set([...tags, ...autoTags]))
 
+  // Final guard: ensure every ingredient is { text: string } before insert.
+  // Anything else writes a row that later breaks RSC serialization on /meals.
+  const safeIngredients = ingredients
+    .map(i => ({ text: typeof i?.text === 'string' ? i.text.trim() : '' }))
+    .filter(i => i.text.length > 0)
+
   const { error } = await supabase.from('meals').insert({
     user_id: user.id,
     title,
     source_url: sourceUrl,
-    ingredients,
+    ingredients: safeIngredients,
     instructions,
     notes,
     tags: mergedTags.length > 0 ? mergedTags : null,
