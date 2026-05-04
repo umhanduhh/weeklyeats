@@ -70,12 +70,35 @@ export function MealForm({
     try { new URL(s); return true } catch { return false }
   }
 
-  // Downscale and re-encode the image before sending so we don't ship a 10 MB
-  // phone photo through a server action (Next.js caps server-action bodies, and
-  // Anthropic doesn't need that resolution to read text).
-  async function downscaleToJpegBase64(file: File, maxEdge = 1600, quality = 0.85): Promise<string> {
-    const bitmap = await createImageBitmap(file)
-    const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height))
+  function bytesToBase64(bytes: Uint8Array): string {
+    let bin = ''
+    const CHUNK = 0x8000
+    for (let i = 0; i < bytes.length; i += CHUNK) {
+      bin += String.fromCharCode(...bytes.subarray(i, i + CHUNK))
+    }
+    return btoa(bin)
+  }
+
+  // If the file is already small enough to ship as-is, send the original bytes
+  // verbatim — re-encoding through a canvas loses sharp text edges and EXIF
+  // orientation, which both hurt OCR. Only downscale when we'd otherwise
+  // overrun the server-action body limit.
+  async function prepareImage(file: File): Promise<{ base64: string; mediaType: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp' }> {
+    const SMALL_ENOUGH = 5 * 1024 * 1024 // 5 MB raw — well under the 8 MB action limit
+    if (file.size <= SMALL_ENOUGH && /^image\/(jpeg|png|webp|gif)$/.test(file.type)) {
+      const buffer = await file.arrayBuffer()
+      return {
+        base64: bytesToBase64(new Uint8Array(buffer)),
+        mediaType: file.type as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
+      }
+    }
+
+    // Big file — downscale via canvas. `imageOrientation: 'from-image'` makes
+    // createImageBitmap honor the EXIF rotation flag phones embed, so we don't
+    // hand Claude a sideways photo.
+    const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
+    const MAX_EDGE = 1920
+    const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height))
     const w = Math.round(bitmap.width * scale)
     const h = Math.round(bitmap.height * scale)
     const canvas = document.createElement('canvas')
@@ -85,17 +108,14 @@ export function MealForm({
     if (!ctx) throw new Error('Could not prepare image for upload.')
     ctx.drawImage(bitmap, 0, 0, w, h)
     const blob: Blob | null = await new Promise(resolve =>
-      canvas.toBlob(resolve, 'image/jpeg', quality)
+      canvas.toBlob(resolve, 'image/jpeg', 0.92)
     )
     if (!blob) throw new Error('Could not encode image.')
     const buffer = await blob.arrayBuffer()
-    const bytes = new Uint8Array(buffer)
-    let bin = ''
-    const CHUNK = 0x8000
-    for (let i = 0; i < bytes.length; i += CHUNK) {
-      bin += String.fromCharCode(...bytes.subarray(i, i + CHUNK))
+    return {
+      base64: bytesToBase64(new Uint8Array(buffer)),
+      mediaType: 'image/jpeg',
     }
-    return btoa(bin)
   }
 
   function handlePhotoImport() {
@@ -103,8 +123,8 @@ export function MealForm({
     setPhotoError('')
     startPhotoTransition(async () => {
       try {
-        const base64 = await downscaleToJpegBase64(photoFile)
-        const result = await parseRecipeFromImage(base64, 'image/jpeg')
+        const { base64, mediaType } = await prepareImage(photoFile)
+        const result = await parseRecipeFromImage(base64, mediaType)
         if ('error' in result) {
           setPhotoError(result.error)
         } else {
