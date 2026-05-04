@@ -7,18 +7,34 @@ import { MealForm } from '@/components/MealForm'
 type Params = Promise<{ id: string }>
 type SearchParams = Promise<{ error?: string }>
 
-type Ingredient = { text?: string } | string
-
+// Walks any reasonable ingredient shape (including legacy nested arrays) and
+// flattens it to one string per line. Bounded depth so a malformed row can't
+// stack-overflow this on the server.
 function ingredientsToText(value: unknown): string {
-  if (!value) return ''
-  if (Array.isArray(value)) {
-    return (value as Ingredient[])
-      .map(i => (typeof i === 'string' ? i : (i.text ?? '')))
-      .filter(Boolean)
-      .join('\n')
+  const lines: string[] = []
+  function walk(v: unknown, depth: number) {
+    if (depth > 3) return
+    if (Array.isArray(v)) {
+      for (const item of v) walk(item, depth + 1)
+      return
+    }
+    if (typeof v === 'string') {
+      const trimmed = v.trim()
+      if (trimmed) lines.push(trimmed)
+      return
+    }
+    if (v && typeof v === 'object') {
+      const o = v as { text?: unknown; name?: unknown; quantity?: unknown; unit?: unknown }
+      if (typeof o.text === 'string' && o.text.trim()) {
+        lines.push(o.text.trim())
+        return
+      }
+      const parts = [o.quantity, o.unit, o.name].filter(p => typeof p === 'string' && p) as string[]
+      if (parts.length > 0) lines.push(parts.join(' '))
+    }
   }
-  if (typeof value === 'string') return value
-  return ''
+  walk(value, 0)
+  return lines.join('\n')
 }
 
 export default async function EditMealPage({
