@@ -16,6 +16,56 @@ async function requireUser(): Promise<{ error: string } | null> {
   return null
 }
 
+// Claude's recipe responses come back in inconsistent shapes — sometimes flat
+// string arrays, sometimes section objects, sometimes a single string. Flatten
+// any reasonable shape into newline-joined text the form can render.
+function flattenToLines(v: unknown): string {
+  const lines: string[] = []
+  function walk(value: unknown, depth: number) {
+    if (depth > 3) return
+    if (typeof value === 'string') {
+      const trimmed = value.trim()
+      if (trimmed) lines.push(trimmed)
+      return
+    }
+    if (Array.isArray(value)) { value.forEach(item => walk(item, depth + 1)); return }
+    if (value && typeof value === 'object') {
+      const o = value as Record<string, unknown>
+      if (typeof o.text === 'string') { walk(o.text, depth + 1); return }
+      if (typeof o.step === 'string') { walk(o.step, depth + 1); return }
+      if (typeof o.ingredient === 'string') { walk(o.ingredient, depth + 1); return }
+      if (Array.isArray(o.items)) { walk(o.items, depth + 1); return }
+      if (Array.isArray(o.ingredients)) { walk(o.ingredients, depth + 1); return }
+      if (Array.isArray(o.steps)) { walk(o.steps, depth + 1); return }
+    }
+  }
+  walk(v, 0)
+  return lines.join('\n')
+}
+
+function parseRecipeJson(jsonText: string, label: string): ImportResult {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(jsonText)
+  } catch {
+    return { error: `Could not parse the recipe ${label}. Try filling in the fields manually.` }
+  }
+
+  if (parsed && typeof parsed === 'object' && 'error' in parsed && typeof (parsed as { error: unknown }).error === 'string') {
+    return { error: (parsed as { error: string }).error }
+  }
+
+  const p = (parsed ?? {}) as Record<string, unknown>
+  const title = typeof p.title === 'string' ? p.title : ''
+  const ingredients = flattenToLines(p.ingredients)
+  const instructions = flattenToLines(p.instructions)
+
+  if (!ingredients && !instructions) {
+    return { error: `Could not read a recipe ${label}. Try filling in the fields manually.` }
+  }
+  return { title, ingredients, instructions }
+}
+
 export async function parseRecipeFromUrl(url: string): Promise<ImportResult> {
   const authError = await requireUser()
   if (authError) return authError
@@ -76,18 +126,7 @@ ${text}`,
 
   const raw = message.content[0].type === 'text' ? message.content[0].text : ''
   const jsonText = raw.replace(/^```(?:json)?\s*/m, '').replace(/\s*```\s*$/m, '').trim()
-
-  try {
-    const parsed = JSON.parse(jsonText)
-    if (parsed.error) return { error: parsed.error }
-    return {
-      title: parsed.title ?? '',
-      ingredients: (parsed.ingredients as string[]).join('\n'),
-      instructions: (parsed.instructions as string[]).join('\n'),
-    }
-  } catch {
-    return { error: 'Could not parse the recipe. Try filling in the fields manually.' }
-  }
+  return parseRecipeJson(jsonText, 'from this URL')
 }
 
 export async function parseRecipeFromImage(formData: FormData): Promise<ImportResult> {
@@ -154,16 +193,6 @@ Strict rules:
 
   const raw = message.content[0].type === 'text' ? message.content[0].text : ''
   const jsonText = raw.replace(/^```(?:json)?\s*/m, '').replace(/\s*```\s*$/m, '').trim()
-
-  try {
-    const parsed = JSON.parse(jsonText)
-    if (parsed.error) return { error: parsed.error }
-    return {
-      title: parsed.title ?? '',
-      ingredients: (parsed.ingredients as string[]).join('\n'),
-      instructions: (parsed.instructions as string[]).join('\n'),
-    }
-  } catch {
-    return { error: 'Could not parse the recipe from the image. Try filling in the fields manually.' }
-  }
+  console.log(`[parseRecipeFromImage] claude raw response (first 500 chars): ${raw.slice(0, 500)}`)
+  return parseRecipeJson(jsonText, 'from this image')
 }
