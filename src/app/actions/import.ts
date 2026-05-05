@@ -109,11 +109,13 @@ export async function parseRecipeFromImage(formData: FormData): Promise<ImportRe
   const mediaType = file.type as ImageMediaType
   const buffer = await file.arrayBuffer()
   const base64 = Buffer.from(buffer).toString('base64')
+  console.log(`[parseRecipeFromImage] received ${file.size} bytes, type=${file.type}`)
 
   const anthropic = new Anthropic()
   const message = await anthropic.messages.create({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 2048,
+    system: `You transcribe recipes from images. You do not invent or guess content. If the image is unreadable, blurry, doesn't contain a recipe, or you cannot clearly read the ingredients/instructions, you must return {"error": "..."}. NEVER fill in plausible-looking placeholder content. Only transcribe text you can actually see.`,
     messages: [
       {
         role: 'user',
@@ -124,23 +126,26 @@ export async function parseRecipeFromImage(formData: FormData): Promise<ImportRe
           },
           {
             type: 'text',
-            text: `Extract the recipe from this image. It may be a cookbook page, a screenshot, or a handwritten recipe card. Return ONLY valid JSON, no explanation or code fences.
+            text: `Transcribe the recipe in this image. Cookbook page, screenshot, or handwritten card are all fine.
 
-If a recipe is found, return:
+Return ONLY valid JSON. No explanation, no code fences.
+
+If you can clearly read the recipe, return:
 {
-  "title": "Recipe name",
+  "title": "Exact title from the image",
   "ingredients": ["1 lb ground beef", "2 cloves garlic", ...],
   "instructions": ["Brown the beef over medium heat.", "Add garlic and cook 1 min.", ...]
 }
 
-If no recipe is found, return:
-{ "error": "No recipe found in this image" }
+If you cannot clearly read it, the image isn't a recipe, or any field would have to be guessed, return:
+{ "error": "Could not read a recipe from this image" }
 
-Rules:
-- Each ingredient is its own array entry with quantity + unit + name
-- Each instruction is one clear step starting with a verb
-- For handwritten text, transcribe as accurately as possible
-- Clean up any formatting artifacts`,
+Strict rules:
+- Transcribe what you actually see. Do NOT fill in typical or expected ingredients that aren't visible in the image.
+- Each ingredient: quantity + unit + name on its own line, exactly as written in the image (just clean up formatting).
+- Each instruction: one step per array entry, starting with a verb.
+- For handwritten text, transcribe as best you can — but if you can't read a section, return the error rather than guessing.
+- If the image only shows part of a recipe (e.g. ingredients but no instructions), still return the error.`,
           },
         ],
       },
