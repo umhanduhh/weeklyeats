@@ -2,6 +2,7 @@
 
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server'
+import { revalidatePath } from 'next/cache'
 
 type ImportResult =
   | { title: string; ingredients: string; instructions: string }
@@ -195,4 +196,82 @@ Strict rules:
   const jsonText = raw.replace(/^```(?:json)?\s*/m, '').replace(/\s*```\s*$/m, '').trim()
   console.log(`[parseRecipeFromImage] claude raw response (first 500 chars): ${raw.slice(0, 500)}`)
   return parseRecipeJson(jsonText, 'from this image')
+}
+
+// ─── Bulk import: fetch, parse, and save in one shot ─────────────────────────
+
+export type BulkImportResult = { title: string } | { error: string }
+
+export async function importMealFromUrl(url: string): Promise<BulkImportResult> {
+  const authError = await requireUser()
+  if (authError) return authError
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  let html: string
+  try {
+    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; WeeklyEats/1.0)' } })
+    if (!res.ok) return { error: `Could not fetch page (${res.status})` }
+    html = await res.text()
+  } catch {
+    return { error: 'Could not reach that URL' }
+  }
+
+  const pageText = html
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/\s+/g, ' ').trim().slice(0, 20000)
+
+  const anthropic = new Anthropic()
+  const message = await anthropic.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 2048,
+    messages: [{
+      role: 'user',
+      content: `Extract and structure the recipe from this webpage. Return ONLY valid JSON, no code fences.
+
+If a recipe is found:
+{
+  "title": "Recipe name",
+  "ingredients": [{"text": "1 lb ground beef"}, {"text": "2 cloves garlic"}],
+  "instructions": ["Brown the beef over medium heat.", "Add garlic and cook 1 min."]
+}
+
+If no recipe found: { "error": "No recipe found" }
+
+Rules:
+- Each ingredient is its own object with a "text" key, including quantity + unit + name
+- Each instruction is one clear step starting with a verb
+- Clean up any webpage formatting artifacts
+
+Webpage text:
+${pageText}`,
+    }],
+  })
+
+  const raw = message.content[0].type === 'text' ? message.content[0].text : ''
+  const jsonText = raw.replace(/^```(?:json)?\s*/m, '').replace(/\s*```\s*$/m, '').trim()
+
+  let parsed: { title?: string; ingredients?: { text: string }[]; instructions?: string[]; error?: string }
+  try { parsed = JSON.parse(jsonText) } catch { return { error: 'Could not parse recipe from page' } }
+
+  if (parsed.error || !parsed.title) return { error: parsed.error ?? 'No recipe found' }
+
+  const { error: dbError } = await supabase.from('meals').insert({
+    user_id: user.id,
+    title: parsed.title,
+    source_url: url,
+    ingredients: parsed.ingredients ?? [],
+    instructions: (parsed.instructions ?? []).join('\n'),
+    tags: null,
+    is_public: false,
+  })
+
+  if (dbError) return { error: dbError.message }
+  revalidatePath('/meals')
+  return { title: parsed.title }
 }
