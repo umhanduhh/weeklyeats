@@ -18,6 +18,7 @@ const CONCURRENCY = 3
 
 export default function BulkImportPage() {
   const [raw, setRaw] = useState('')
+  const [isPublic, setIsPublic] = useState(false)
   const [items, setItems] = useState<UrlItem[]>([])
   const [running, setRunning] = useState(false)
   const [done, setDone] = useState(false)
@@ -51,7 +52,7 @@ export default function BulkImportPage() {
           const url = queue.shift()!
           active++
           patch(url, { status: 'importing' })
-          importMealFromUrl(url).then(result => {
+          importMealFromUrl(url, isPublic).then(result => {
             if ('error' in result) {
               patch(url, { status: 'error', error: result.error })
             } else {
@@ -117,7 +118,45 @@ export default function BulkImportPage() {
               onFocus={e => (e.currentTarget.style.borderColor = '#00A6A6')}
               onBlur={e => (e.currentTarget.style.borderColor = '#E2E8F0')}
             />
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '12px' }}>
+
+            {/* Share with community toggle */}
+            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '14px', cursor: 'pointer' }}>
+              <div
+                onClick={() => setIsPublic(p => !p)}
+                style={{
+                  width: '40px',
+                  height: '22px',
+                  borderRadius: '11px',
+                  background: isPublic ? '#00A6A6' : '#CBD5E1',
+                  position: 'relative',
+                  transition: 'background 150ms',
+                  flexShrink: 0,
+                  cursor: 'pointer',
+                }}
+              >
+                <div style={{
+                  position: 'absolute',
+                  top: '3px',
+                  left: isPublic ? '21px' : '3px',
+                  width: '16px',
+                  height: '16px',
+                  borderRadius: '50%',
+                  background: '#fff',
+                  transition: 'left 150ms',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                }} />
+              </div>
+              <span style={{ fontSize: '0.875rem', color: '#1A1A1A' }}>
+                Share with community
+              </span>
+              {isPublic && (
+                <span style={{ fontSize: '0.75rem', color: '#00A6A6' }}>
+                  All imported recipes will be public
+                </span>
+              )}
+            </label>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '14px' }}>
               <span style={{ fontSize: '0.8125rem', color: '#94A3B8' }}>
                 {urlCount > 0 ? `${urlCount} URL${urlCount !== 1 ? 's' : ''} detected` : 'Paste URLs above'}
               </span>
@@ -138,7 +177,7 @@ export default function BulkImportPage() {
             {done && (
               <div className="card" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span style={{ fontSize: '0.9375rem', color: '#1A1A1A' }}>
-                  {successCount} imported{errorCount > 0 ? `, ${errorCount} failed` : ' successfully'}
+                  {successCount} imported{isPublic ? ' & shared' : ''}{errorCount > 0 ? `, ${errorCount} failed` : ' successfully'}
                 </span>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button

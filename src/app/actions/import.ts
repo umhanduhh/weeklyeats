@@ -202,7 +202,7 @@ Strict rules:
 
 export type BulkImportResult = { title: string } | { error: string }
 
-export async function importMealFromUrl(url: string): Promise<BulkImportResult> {
+export async function importMealFromUrl(url: string, isPublic = false): Promise<BulkImportResult> {
   const authError = await requireUser()
   if (authError) return authError
 
@@ -268,7 +268,7 @@ ${pageText}`,
     ingredients: parsed.ingredients ?? [],
     instructions: (parsed.instructions ?? []).join('\n'),
     tags: null,
-    is_public: false,
+    is_public: isPublic,
   })
 
   if (dbError) return { error: dbError.message }

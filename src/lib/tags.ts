@@ -1,4 +1,7 @@
 export const PRESET_TAGS = [
+  { value: 'breakfast',     label: 'Breakfast',     className: 'tag tag-breakfast' },
+  { value: 'lunch',         label: 'Lunch',         className: 'tag tag-lunch' },
+  { value: 'snack',         label: 'Snack',         className: 'tag tag-snack' },
   { value: 'red-meat',      label: 'Red Meat',      className: 'tag tag-red-meat' },
   { value: 'crockpot',      label: 'Crockpot',      className: 'tag tag-crockpot' },
   { value: 'vegetarian',    label: 'Vegetarian',    className: 'tag tag-vegetarian' },
