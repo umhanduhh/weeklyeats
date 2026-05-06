@@ -80,9 +80,14 @@ export default async function MealsPage({ searchParams }: { searchParams: Search
           </div>
 
           {tab === 'mine' && (
-            <Link href="/meals/new" className="btn-primary" style={{ padding: '8px 16px', fontSize: '0.875rem' }}>
-              + Add meal
-            </Link>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <Link href="/meals/bulk-import" style={{ padding: '8px 14px', fontSize: '0.875rem', border: '1.5px solid #E2E8F0', borderRadius: '8px', color: '#64748B', textDecoration: 'none', background: '#fff' }}>
+                ↑ Bulk import
+              </Link>
+              <Link href="/meals/new" className="btn-primary" style={{ padding: '8px 16px', fontSize: '0.875rem' }}>
+                + Add meal
+              </Link>
+            </div>
           )}
         </div>
 
