@@ -2,9 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { AppHeader } from '@/components/AppHeader'
-import { MealCard } from '@/components/MealCard'
-import { copyMealToCollection } from '@/app/actions/meals'
-import { EditMealLink } from '@/components/EditMealLink'
+import { MealsList } from '@/components/MealsList'
 
 type SearchParams = Promise<{ tab?: string; copied?: string; updated?: string; error?: string }>
 
@@ -150,64 +148,12 @@ export default async function MealsPage({ searchParams }: { searchParams: Search
 
         {/* My Meals */}
         {tab === 'mine' && (
-          <div className="mt-4 space-y-2">
-            {myMeals.length === 0 ? (
-              <div className="text-center py-16" style={{ color: '#94A3B8' }}>
-                <p style={{ fontSize: '1rem' }}>No meals yet.</p>
-                <Link href="/meals/new" className="btn-primary inline-flex mt-4" style={{ fontSize: '0.875rem', padding: '8px 20px' }}>
-                  Add your first meal
-                </Link>
-              </div>
-            ) : (
-              myMeals.map(meal => <MealCard key={meal.id} meal={meal} canCalculateMacros action={<EditMealLink mealId={meal.id} />} />)
-            )}
-          </div>
+          <MealsList meals={myMeals} mode="mine" currentUserId={user.id} />
         )}
 
         {/* Community Meals */}
         {tab === 'community' && (
-          <div className="mt-4 space-y-2">
-            {communityMeals.length === 0 ? (
-              <div className="text-center py-16" style={{ color: '#94A3B8' }}>
-                <p style={{ fontSize: '1rem' }}>No public meals from the community yet.</p>
-              </div>
-            ) : (
-              communityMeals.map(meal => (
-                <MealCard
-                  key={meal.id}
-                  meal={meal}
-                  action={meal.user_id !== user!.id ? (
-                    <form action={copyMealToCollection}>
-                      <input type="hidden" name="meal_id" value={meal.id} />
-                      <button
-                        type="submit"
-                        title="Add to my collection"
-                        style={{
-                          width: '32px',
-                          height: '32px',
-                          borderRadius: '50%',
-                          background: '#E0F5F5',
-                          color: '#00A6A6',
-                          border: 'none',
-                          fontSize: '1.25rem',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          lineHeight: 1,
-                          flexShrink: 0,
-                        }}
-                      >
-                        +
-                      </button>
-                    </form>
-                  ) : (
-                    <span style={{ fontSize: '0.75rem', color: '#94A3B8', padding: '6px 0' }}>Yours</span>
-                  )}
-                />
-              ))
-            )}
-          </div>
+          <MealsList meals={communityMeals} mode="community" currentUserId={user.id} />
         )}
       </div>
     </div>
