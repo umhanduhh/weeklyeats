@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import { getTagClass, getTagLabel } from '@/lib/tags'
+import { calculateMealMacros } from '@/app/actions/macros'
 
 function getDomain(url: string) {
   try { return new URL(url).hostname.replace('www.', '') }
@@ -19,11 +20,18 @@ export type Meal = {
   ingredients: Ingredient[] | null
   instructions: string | null
   notes?: string | null
+  servings?: number | null
+  calories?: number | null
+  protein_g?: number | null
+  carbs_g?: number | null
+  fat_g?: number | null
 }
 
 type Props = {
   meal: Meal
   action?: React.ReactNode
+  /** Show the "Calculate macros" button when macros are absent. Off for community tab. */
+  canCalculateMacros?: boolean
 }
 
 function formatIngredients(ingredients: Ingredient[]): string[] {
@@ -44,10 +52,42 @@ function formatInstructions(instructions: string): string[] {
     .filter(Boolean)
 }
 
-export function MealCard({ meal, action }: Props) {
+export function MealCard({ meal, action, canCalculateMacros = false }: Props) {
   const [open, setOpen] = useState(false)
+  const [calcPending, startCalc] = useTransition()
+  const [calcError, setCalcError] = useState('')
+  // Local optimistic copy of macros so the compact line updates without a full
+  // page roundtrip. revalidatePath('/meals') still fires server-side so a hard
+  // reload reflects the same state.
+  const [localMacros, setLocalMacros] = useState<{
+    servings?: number | null
+    calories?: number | null
+    protein_g?: number | null
+    carbs_g?: number | null
+    fat_g?: number | null
+  }>({
+    servings: meal.servings,
+    calories: meal.calories,
+    protein_g: meal.protein_g,
+    carbs_g: meal.carbs_g,
+    fat_g: meal.fat_g,
+  })
 
+  const hasMacros = localMacros.calories != null && localMacros.servings != null
   const hasContent = (meal.ingredients && meal.ingredients.length > 0) || meal.instructions || meal.notes
+
+  function handleCalculate(e: React.MouseEvent) {
+    e.stopPropagation()
+    setCalcError('')
+    startCalc(async () => {
+      const result = await calculateMealMacros(meal.id)
+      if (result.ok) {
+        setLocalMacros(result.macros)
+      } else {
+        setCalcError(result.error)
+      }
+    })
+  }
 
   return (
     <div className="card overflow-hidden">
@@ -95,6 +135,40 @@ export function MealCard({ meal, action }: Props) {
               {getDomain(meal.source_url)}
             </a>
           )}
+
+          {/* Macros line — only shown once macros have been calculated.
+              When absent on a user-owned meal we render a calculate button instead. */}
+          {hasMacros ? (
+            <div
+              className="mt-1"
+              style={{ fontSize: '0.75rem', color: '#64748B', fontVariantNumeric: 'tabular-nums' }}
+            >
+              ≈ {localMacros.calories} cal · {localMacros.protein_g}p · {localMacros.carbs_g}c · {localMacros.fat_g}f
+              <span style={{ color: '#94A3B8' }}> · serves {localMacros.servings}</span>
+            </div>
+          ) : canCalculateMacros ? (
+            <div className="mt-1 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleCalculate}
+                disabled={calcPending}
+                style={{
+                  fontSize: '0.75rem',
+                  color: '#00A6A6',
+                  background: 'transparent',
+                  border: '1px dashed #B6E2E2',
+                  borderRadius: '6px',
+                  padding: '2px 8px',
+                  cursor: calcPending ? 'wait' : 'pointer',
+                }}
+              >
+                {calcPending ? 'Calculating…' : 'Calculate macros'}
+              </button>
+              {calcError && (
+                <span style={{ fontSize: '0.75rem', color: '#991B1B' }}>{calcError}</span>
+              )}
+            </div>
+          ) : null}
         </div>
         {action && <div className="flex-shrink-0" onClick={e => e.stopPropagation()}>{action}</div>}
       </div>

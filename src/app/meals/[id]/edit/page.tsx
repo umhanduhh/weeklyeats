@@ -53,7 +53,7 @@ export default async function EditMealPage({
 
   const { data: meal } = await supabase
     .from('meals')
-    .select('id, title, source_url, ingredients, instructions, notes, tags, is_public, user_id')
+    .select('id, title, source_url, ingredients, instructions, notes, tags, is_public, user_id, servings, calories, protein_g, carbs_g, fat_g')
     .eq('id', id)
     .eq('user_id', user.id)
     .maybeSingle()
@@ -90,6 +90,11 @@ export default async function EditMealPage({
           initialNotes={meal.notes ?? ''}
           initialTags={meal.tags ?? []}
           initialIsPublic={!!meal.is_public}
+          initialServings={meal.servings ?? null}
+          initialCalories={meal.calories ?? null}
+          initialProteinG={meal.protein_g ?? null}
+          initialCarbsG={meal.carbs_g ?? null}
+          initialFatG={meal.fat_g ?? null}
         />
       </div>
     </div>

@@ -40,7 +40,16 @@ type Props = {
   initialNotes?: string
   initialTags?: string[]
   initialIsPublic?: boolean
+  initialServings?: number | null
+  initialCalories?: number | null
+  initialProteinG?: number | null
+  initialCarbsG?: number | null
+  initialFatG?: number | null
 }
+
+// Stringify a nullable int for use as the initial value of a number input.
+// Empty string = blank field = "no override / clear the column".
+const intStr = (n: number | null | undefined) => (n == null ? '' : String(n))
 
 export function MealForm({
   mode = 'create',
@@ -52,6 +61,11 @@ export function MealForm({
   initialNotes = '',
   initialTags = [],
   initialIsPublic = false,
+  initialServings = null,
+  initialCalories = null,
+  initialProteinG = null,
+  initialCarbsG = null,
+  initialFatG = null,
 }: Props = {}) {
   const [title, setTitle] = useState(initialTitle)
   const [sourceUrl, setSourceUrl] = useState(initialSourceUrl)
@@ -59,6 +73,11 @@ export function MealForm({
   const [instructions, setInstructions] = useState(initialInstructions)
   const [notes, setNotes] = useState(initialNotes)
   const [isPublic, setIsPublic] = useState(initialIsPublic)
+  const [servings, setServings] = useState(intStr(initialServings))
+  const [calories, setCalories] = useState(intStr(initialCalories))
+  const [proteinG, setProteinG] = useState(intStr(initialProteinG))
+  const [carbsG, setCarbsG] = useState(intStr(initialCarbsG))
+  const [fatG, setFatG] = useState(intStr(initialFatG))
   const [importError, setImportError] = useState('')
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoError, setPhotoError] = useState('')
@@ -316,6 +335,84 @@ export function MealForm({
             style={{ resize: 'vertical' }}
           />
         </div>
+
+        {/* Macros — edit mode only. Leave blank to keep whatever the
+            Calculate macros button last saved (or null for not-yet-computed). */}
+        {isEdit && (
+          <div className="border-t pt-4" style={{ borderColor: '#F1F5F9' }}>
+            <p className="label mb-1">Macros (per serving)</p>
+            <p className="mb-3" style={{ fontSize: '0.8125rem', color: '#94A3B8' }}>
+              Override the auto-calculated values. Leave any field blank to clear it.
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px' }}>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span style={{ fontSize: '0.75rem', color: '#64748B' }}>Servings</span>
+                <input
+                  type="number"
+                  name="servings"
+                  min={1}
+                  max={50}
+                  value={servings}
+                  onChange={e => setServings(e.target.value)}
+                  className="input"
+                  style={{ padding: '8px 10px', fontSize: '0.875rem' }}
+                />
+              </label>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span style={{ fontSize: '0.75rem', color: '#64748B' }}>Calories</span>
+                <input
+                  type="number"
+                  name="calories"
+                  min={0}
+                  max={5000}
+                  value={calories}
+                  onChange={e => setCalories(e.target.value)}
+                  className="input"
+                  style={{ padding: '8px 10px', fontSize: '0.875rem' }}
+                />
+              </label>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span style={{ fontSize: '0.75rem', color: '#64748B' }}>Protein (g)</span>
+                <input
+                  type="number"
+                  name="protein_g"
+                  min={0}
+                  max={500}
+                  value={proteinG}
+                  onChange={e => setProteinG(e.target.value)}
+                  className="input"
+                  style={{ padding: '8px 10px', fontSize: '0.875rem' }}
+                />
+              </label>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span style={{ fontSize: '0.75rem', color: '#64748B' }}>Carbs (g)</span>
+                <input
+                  type="number"
+                  name="carbs_g"
+                  min={0}
+                  max={500}
+                  value={carbsG}
+                  onChange={e => setCarbsG(e.target.value)}
+                  className="input"
+                  style={{ padding: '8px 10px', fontSize: '0.875rem' }}
+                />
+              </label>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span style={{ fontSize: '0.75rem', color: '#64748B' }}>Fat (g)</span>
+                <input
+                  type="number"
+                  name="fat_g"
+                  min={0}
+                  max={500}
+                  value={fatG}
+                  onChange={e => setFatG(e.target.value)}
+                  className="input"
+                  style={{ padding: '8px 10px', fontSize: '0.875rem' }}
+                />
+              </label>
+            </div>
+          </div>
+        )}
 
         {/* Public toggle */}
         <div className="flex items-center justify-between py-2 border-t" style={{ borderColor: '#F1F5F9' }}>
