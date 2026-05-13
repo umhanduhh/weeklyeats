@@ -192,6 +192,20 @@ export async function updateMeal(formData: FormData) {
   const tags = formData.getAll('tags') as string[]
   const isPublic = formData.get('is_public') === 'on'
 
+  // Macro overrides — blank input = null = clear that column. The CHECK
+  // constraints in 2026_05_06_macros.sql will reject out-of-range values.
+  const parseInt = (key: string): number | null => {
+    const raw = (formData.get(key) as string | null)?.trim()
+    if (!raw) return null
+    const n = Number(raw)
+    return Number.isFinite(n) ? Math.round(n) : null
+  }
+  const servings = parseInt('servings')
+  const calories = parseInt('calories')
+  const protein_g = parseInt('protein_g')
+  const carbs_g = parseInt('carbs_g')
+  const fat_g = parseInt('fat_g')
+
   // Edit mode skips AI re-formatting — the user is making targeted tweaks.
   // Store ingredients in the same { text } shape createMeal produces so MealCard
   // renders consistently.
@@ -218,6 +232,11 @@ export async function updateMeal(formData: FormData) {
       notes,
       tags: mergedTags.length > 0 ? mergedTags : null,
       is_public: isPublic,
+      servings,
+      calories,
+      protein_g,
+      carbs_g,
+      fat_g,
     })
     .eq('id', mealId)
     .eq('user_id', user.id)
@@ -238,7 +257,7 @@ export async function copyMealToCollection(formData: FormData) {
 
   const { data: original, error: fetchError } = await supabase
     .from('meals')
-    .select('title, source_url, ingredients, instructions, tags')
+    .select('title, source_url, ingredients, instructions, tags, servings, calories, protein_g, carbs_g, fat_g')
     .eq('id', mealId)
     .eq('is_public', true)
     .single()
@@ -255,6 +274,12 @@ export async function copyMealToCollection(formData: FormData) {
     instructions: original.instructions,
     tags: original.tags,
     is_public: false,
+    // Macros come along — they're intrinsic to the recipe, not the owner.
+    servings: original.servings,
+    calories: original.calories,
+    protein_g: original.protein_g,
+    carbs_g: original.carbs_g,
+    fat_g: original.fat_g,
   })
 
   if (error) {

@@ -48,6 +48,11 @@ type RawMealRow = {
   instructions: string | null
   notes?: string | null
   user_id?: string
+  servings?: number | null
+  calories?: number | null
+  protein_g?: number | null
+  carbs_g?: number | null
+  fat_g?: number | null
 }
 
 function normalizeMeal(m: RawMealRow) {
@@ -64,12 +69,12 @@ export default async function MealsPage({ searchParams }: { searchParams: Search
   const [myMealsRes, communityMealsRes] = await Promise.all([
     supabase
       .from('meals')
-      .select('id, title, source_url, tags, ingredients, instructions, notes')
+      .select('id, title, source_url, tags, ingredients, instructions, notes, servings, calories, protein_g, carbs_g, fat_g')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false }),
     supabase
       .from('meals')
-      .select('id, title, source_url, tags, ingredients, instructions, user_id')
+      .select('id, title, source_url, tags, ingredients, instructions, user_id, servings, calories, protein_g, carbs_g, fat_g')
       .eq('is_public', true)
       .order('created_at', { ascending: false }),
   ])
@@ -154,7 +159,7 @@ export default async function MealsPage({ searchParams }: { searchParams: Search
                 </Link>
               </div>
             ) : (
-              myMeals.map(meal => <MealCard key={meal.id} meal={meal} action={<EditMealLink mealId={meal.id} />} />)
+              myMeals.map(meal => <MealCard key={meal.id} meal={meal} canCalculateMacros action={<EditMealLink mealId={meal.id} />} />)
             )}
           </div>
         )}
