@@ -24,7 +24,7 @@ export function GroceryList({ planId, listId: initialListId, weekLabel, weekOffs
   const [items, setItems] = useState<GroceryItem[]>(initialItems ?? [])
   const [hasList, setHasList] = useState(initialItems !== null)
   const [listId, setListId] = useState<string | null>(initialListId)
-  const [groupBy, setGroupBy] = useState<'category' | 'store'>('category')
+  const [groupBy, setGroupBy] = useState<'category' | 'store' | 'meal'>('category')
   const [isPending, startTransition] = useTransition()
   const [generateError, setGenerateError] = useState<string | null>(null)
   const [editingStoreId, setEditingStoreId] = useState<string | null>(null)
@@ -105,6 +105,35 @@ export function GroceryList({ planId, listId: initialListId, weekLabel, weekOffs
           items: items.filter(i => i.category === cat || (!GROCERY_CATEGORIES.includes(i.category) && cat === 'Other')),
         }))
         .filter(g => g.items.length > 0)
+    }
+
+    if (groupBy === 'meal') {
+      // One bucket per meal — an item shared across two meals shows under both.
+      // (Toggling 'checked' is still one truth: same row, same checked state,
+      // appears checked in every bucket it lives in.) Items with no meal
+      // attribution — freeform parseAndAddItems — land in "Added by hand".
+      const byMeal = new Map<string, GroceryItem[]>()
+      const orphans: GroceryItem[] = []
+      for (const item of items) {
+        const titles = item.meals ?? []
+        if (titles.length === 0) {
+          orphans.push(item)
+          continue
+        }
+        for (const title of titles) {
+          if (!byMeal.has(title)) byMeal.set(title, [])
+          byMeal.get(title)!.push(item)
+        }
+      }
+
+      const result: Array<{ label: string; icon: string; items: GroceryItem[] }> = []
+      ;[...byMeal.entries()]
+        .sort(([a], [b]) => a.localeCompare(b))
+        .forEach(([title, itms]) => result.push({ label: title, icon: '🍽', items: itms }))
+      if (orphans.length > 0) {
+        result.push({ label: 'Added by hand', icon: '✎', items: orphans })
+      }
+      return result
     }
 
     // By store
@@ -298,11 +327,14 @@ export function GroceryList({ planId, listId: initialListId, weekLabel, weekOffs
           <span style={{ fontSize: '0.8125rem', color: '#64748B', whiteSpace: 'nowrap' }}>{checkedCount} of {total}</span>
         </div>
 
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+          {(['category', 'store', 'meal'] as const).map(opt => (
         <div className="flex gap-2">
           {(['category', 'store'] as const).map(opt => (
             <button
               key={opt}
               onClick={() => setGroupBy(opt)}
+              aria-pressed={groupBy === opt}
               style={{
                 padding: '8px 14px',
                 minHeight: '36px',
@@ -316,7 +348,7 @@ export function GroceryList({ planId, listId: initialListId, weekLabel, weekOffs
                 cursor: 'pointer',
               }}
             >
-              {opt === 'category' ? 'By category' : 'By store'}
+              {opt === 'category' ? 'By category' : opt === 'store' ? 'By store' : 'By meal'}
             </button>
           ))}
         </div>
@@ -430,8 +462,11 @@ export function GroceryList({ planId, listId: initialListId, weekLabel, weekOffs
                   </select>
                 )}
 
-                {/* Store tag — shown in category view */}
-                {groupBy === 'category' && (
+                {/* Store tag — shown when NOT grouping by store. The store axis
+                    is hidden in store view because the section header already
+                    is the store; everywhere else (category, meal) it's the
+                    most useful side-info to keep on each row. */}
+                {groupBy !== 'store' && (
                   editingStoreId === item.id ? (
                     <input
                       autoFocus
