@@ -99,10 +99,13 @@ export async function generateGroceryList(planId: string): Promise<{ error?: str
   const knownTitles = ingredientsByMeal.map(m => m.title)
 
   // Use Claude to parse, deduplicate, categorize, and attribute to source meals.
+  // max_tokens raised from 2048 → 4096: per-item `meals` arrays inflated the
+  // response payload, and a full week of meals was truncating mid-array — the
+  // unterminated JSON then hit the catch block as a parse failure.
   const anthropic = new Anthropic()
   const message = await anthropic.messages.create({
     model: 'claude-haiku-4-5-20251001',
-    max_tokens: 2048,
+    max_tokens: 4096,
     messages: [{
       role: 'user',
       content: `Below are ingredients for a weekly meal plan, grouped by meal. Please:
@@ -134,12 +137,22 @@ ${mealSections}`,
   })
 
   const raw = message.content[0].type === 'text' ? message.content[0].text : '[]'
-  const jsonText = raw.replace(/^```(?:json)?\s*/m, '').replace(/\s*```\s*$/m, '').trim()
+
+  // Claude occasionally wraps the JSON in prose ("Here's the parsed list…") or
+  // a fenced code block. Strip fences first, then carve out the outermost
+  // [...]. The greedy regex tolerates leading/trailing commentary; falling
+  // through to the raw text preserves the old behavior when nothing wraps it.
+  const stripped = raw.replace(/^```(?:json)?\s*/m, '').replace(/\s*```\s*$/m, '').trim()
+  const arrayMatch = stripped.match(/\[[\s\S]*\]/)
+  const jsonText = arrayMatch ? arrayMatch[0] : stripped
 
   let parsed: Array<{ ingredient: string; category: string; meals?: unknown }>
   try {
     parsed = JSON.parse(jsonText)
   } catch {
+    return { error: 'Could not parse the grocery list. Try again.' }
+  }
+  if (!Array.isArray(parsed)) {
     return { error: 'Could not parse the grocery list. Try again.' }
   }
 
@@ -233,12 +246,20 @@ ${rawText}`,
   })
 
   const raw = message.content[0].type === 'text' ? message.content[0].text : '[]'
-  const jsonText = raw.replace(/^```(?:json)?\s*/m, '').replace(/\s*```\s*$/m, '').trim()
+
+  // Same defensive parsing as generateGroceryList — Claude sometimes wraps the
+  // JSON array in prose. Strip fences, then carve out the outermost [...].
+  const stripped = raw.replace(/^```(?:json)?\s*/m, '').replace(/\s*```\s*$/m, '').trim()
+  const arrayMatch = stripped.match(/\[[\s\S]*\]/)
+  const jsonText = arrayMatch ? arrayMatch[0] : stripped
 
   let parsed: Array<{ ingredient: string; category: string }>
   try {
     parsed = JSON.parse(jsonText)
   } catch {
+    return { error: 'Could not parse your items. Try again.' }
+  }
+  if (!Array.isArray(parsed)) {
     return { error: 'Could not parse your items. Try again.' }
   }
 
