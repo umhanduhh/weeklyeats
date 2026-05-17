@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition, useRef, useEffect } from 'react'
+import Link from 'next/link'
 import { MealPicker, type MealOption } from '@/components/MealPicker'
 import { assignMealToSlot, setSlotNote, clearSlot, generateWeek, setSlotConstraints } from '@/app/actions/planner'
 import { getTagClass, getTagLabel, PRESET_TAGS } from '@/lib/tags'
@@ -340,10 +341,28 @@ export function WeeklyPlanner({ planId, initialSlots, weekStartDate, weekOffset,
                           </span>
                         </div>
                       ) : slot.meals ? (
+                        // Title links to the recipe view. ?from=planner so the
+                        // back link there says "← Planner" instead of "← Meals".
+                        // Tags stay outside the link so a stray tap on a tag
+                        // doesn't navigate — they're just decoration here.
                         <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                          <span style={{ fontFamily: 'Georgia, serif', fontSize: '0.9375rem', color: '#1A1A1A' }}>
+                          <Link
+                            href={`/meals/${slot.meals.id}?from=planner`}
+                            className="meal-title-link"
+                            style={{
+                              fontFamily: 'Georgia, serif',
+                              fontSize: '0.9375rem',
+                              color: '#1A1A1A',
+                              textDecoration: 'none',
+                              // Generous padding for thumb reach without
+                              // disrupting the surrounding row layout.
+                              padding: '6px 4px',
+                              margin: '-6px -4px',
+                              borderRadius: '6px',
+                            }}
+                          >
                             {slot.meals.title}
-                          </span>
+                          </Link>
                           {slot.meals.tags?.map(tag => (
                             <span key={tag} className={getTagClass(tag)} style={{ fontSize: '0.6875rem', padding: '2px 8px' }}>
                               {getTagLabel(tag)}
