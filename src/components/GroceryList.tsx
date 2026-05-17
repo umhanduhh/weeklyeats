@@ -327,10 +327,14 @@ export function GroceryList({ planId, listId: initialListId, weekLabel, weekOffs
           <span style={{ fontSize: '0.8125rem', color: '#64748B', whiteSpace: 'nowrap' }}>{checkedCount} of {total}</span>
         </div>
 
-        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+        {/* Group-by pill toggle. The squash-merge of PR #17 (mobile sizing on
+            the existing By category / By store pills) and PR #18 (third "By
+            meal" option) into main left a tangled JSX tree here — two opening
+            <div>s, two `.map(opt =>` lines, never balanced. This restores the
+            intended merged shape: one wrapper, three options, mobile-friendly
+            padding. */}
+        <div className="flex gap-2 flex-wrap">
           {(['category', 'store', 'meal'] as const).map(opt => (
-        <div className="flex gap-2">
-          {(['category', 'store'] as const).map(opt => (
             <button
               key={opt}
               onClick={() => setGroupBy(opt)}
