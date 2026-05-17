@@ -1,0 +1,50 @@
+# Catches the class of bug that broke prod after PR #18: a JSX tree that
+# tsc rejects but Vercel only finds out at build time, after main has moved.
+#
+# Runs on every PR and every push to main. The push-to-main run is the
+# important one — if two PRs squash-merge in sequence and combine into
+# something that doesn't compile (exactly what happened with #17+#18),
+# CI here goes red before anyone notices via a failed deploy.
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# A new commit on a branch supersedes any in-flight run for that branch.
+# Saves Actions minutes and gets newer commits to feedback faster.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: typecheck + lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Match Next 16's supported runtime. Bump when local node bumps.
+          node-version: '20'
+          cache: 'npm'
+
+      # `npm ci` rather than `npm install` so the lockfile is honored exactly.
+      # Fails fast if package.json and package-lock.json drift apart.
+      - name: Install dependencies
+        run: npm ci
+
+      # tsc alone caught the GroceryList JSX issue locally, so we run it first
+      # and fail fast before the slower steps.
+      - name: TypeScript
+        run: npx tsc --noEmit
+
+      # eslint is allowed warnings (the project has a few legacy ones) but
+      # any new error fails the run. If you want to enforce zero warnings
+      # later, add --max-warnings 0 here.
+      - name: ESLint
+        run: npx eslint src/

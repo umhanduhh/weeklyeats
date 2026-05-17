@@ -212,7 +212,7 @@ export function GroceryList({ planId, listId: initialListId, weekLabel, weekOffs
             No grocery list yet
           </p>
           <p style={{ fontSize: '0.875rem', color: '#64748B', marginBottom: '24px' }}>
-            Assign meals to your week in the planner, then build your shopping list — we'll parse and categorize every ingredient automatically.
+            Assign meals to your week in the planner, then build your shopping list — we&apos;ll parse and categorize every ingredient automatically.
           </p>
           {generateError && (
             <p style={{ fontSize: '0.875rem', color: '#EF4444', marginBottom: '16px' }}>{generateError}</p>
@@ -550,7 +550,7 @@ export function GroceryList({ planId, listId: initialListId, weekLabel, weekOffs
         {addingItems ? (
           <div className="card" style={{ padding: '14px 16px' }}>
             <p style={{ fontSize: '0.8125rem', color: '#64748B', marginBottom: '8px' }}>
-              Jot down whatever you need — one item per line, comma-separated, however you like. We'll sort it out.
+              Jot down whatever you need — one item per line, comma-separated, however you like. We&apos;ll sort it out.
             </p>
             <textarea
               autoFocus
