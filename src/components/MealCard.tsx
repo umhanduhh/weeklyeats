@@ -32,6 +32,10 @@ type Props = {
   action?: React.ReactNode
   /** Show the "Calculate macros" button when macros are absent. Off for community tab. */
   canCalculateMacros?: boolean
+  /** Start with the accordion expanded. Used by the /meals/[id] detail route so
+   *  landing on the page shows ingredients/instructions immediately. The user
+   *  can still tap to collapse. */
+  defaultOpen?: boolean
 }
 
 function formatIngredients(ingredients: Ingredient[]): string[] {
@@ -52,8 +56,8 @@ function formatInstructions(instructions: string): string[] {
     .filter(Boolean)
 }
 
-export function MealCard({ meal, action, canCalculateMacros = false }: Props) {
-  const [open, setOpen] = useState(false)
+export function MealCard({ meal, action, canCalculateMacros = false, defaultOpen = false }: Props) {
+  const [open, setOpen] = useState(defaultOpen)
   const [calcPending, startCalc] = useTransition()
   const [calcError, setCalcError] = useState('')
   // Local optimistic copy of macros so the compact line updates without a full

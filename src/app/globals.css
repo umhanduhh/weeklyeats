@@ -295,6 +295,20 @@ h1, h2, h3, h4, h5, h6 {
     transform: translateX(20px);
   }
 
+  /* Meal title links in the planner. Subtle hover so the tappable affordance
+     is discoverable without making every meal title shout "I AM A LINK". */
+  .meal-title-link {
+    transition: color 150ms, background-color 150ms;
+  }
+  .meal-title-link:hover,
+  .meal-title-link:focus-visible {
+    color: var(--color-teal) !important;
+    outline: none;
+  }
+  .meal-title-link:active {
+    background-color: var(--color-teal-light);
+  }
+
   /* Tappable row in the MealPicker bottom sheet. Mirrors what
      onMouseEnter/onMouseLeave used to do, but works on touch. */
   .meal-picker-row:hover,
