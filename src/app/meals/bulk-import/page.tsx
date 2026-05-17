@@ -90,7 +90,7 @@ export default function BulkImportPage() {
             Bulk import recipes
           </h2>
           <p style={{ fontSize: '0.875rem', color: '#64748B' }}>
-            Paste recipe URLs below, one per line. We'll import them all automatically.
+            Paste recipe URLs below, one per line. We&apos;ll import them all automatically.
           </p>
         </div>
 
