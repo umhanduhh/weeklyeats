@@ -73,12 +73,16 @@ function ConstraintPicker({ slot, onSet }: { slot: Slot; onSet: (tags: string[])
     <div ref={ref} style={{ position: 'relative', flexShrink: 0 }}>
       <button
         onClick={() => setOpen(o => !o)}
+        // Was 2x10 padding at 11px font — basically untappable on phone. Bumped
+        // to a real pill shape; whitespace-nowrap is kept so a long set of
+        // constraint labels can scroll horizontally rather than wrap.
         style={{
           background: hasConstraints ? '#E0F5F5' : 'none',
           border: hasConstraints ? '1px solid #00A6A6' : '1px dashed #CBD5E1',
           borderRadius: '20px',
-          padding: '2px 10px',
-          fontSize: '0.6875rem',
+          padding: '6px 12px',
+          minHeight: '32px',
+          fontSize: '0.75rem',
           fontWeight: 500,
           color: hasConstraints ? '#007A7A' : '#94A3B8',
           cursor: 'pointer',
@@ -121,15 +125,16 @@ function ConstraintPicker({ slot, onSet }: { slot: Slot; onSet: (tags: string[])
                   background: selected ? '#E0F5F5' : 'none',
                   border: 'none',
                   borderRadius: '6px',
-                  padding: '5px 8px',
+                  padding: '10px 8px',
+                  minHeight: '40px',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
                 }}
               >
-                <span className={className} style={{ fontSize: '0.6875rem', padding: '2px 8px' }}>{label}</span>
-                {selected && <span style={{ color: '#00A6A6', fontSize: '0.75rem', marginLeft: 'auto' }}>✓</span>}
+                <span className={className} style={{ fontSize: '0.75rem', padding: '3px 10px' }}>{label}</span>
+                {selected && <span style={{ color: '#00A6A6', fontSize: '0.8125rem', marginLeft: 'auto' }}>✓</span>}
               </button>
             )
           })}
@@ -138,7 +143,17 @@ function ConstraintPicker({ slot, onSet }: { slot: Slot; onSet: (tags: string[])
               <div style={{ borderTop: '1px solid #F1F5F9', margin: '4px 0' }} />
               <button
                 onClick={() => { onSet([]); setOpen(false) }}
-                style={{ textAlign: 'left', background: 'none', border: 'none', borderRadius: '6px', padding: '5px 8px', cursor: 'pointer', fontSize: '0.8125rem', color: '#94A3B8' }}
+                style={{
+                  textAlign: 'left',
+                  background: 'none',
+                  border: 'none',
+                  borderRadius: '6px',
+                  padding: '10px 8px',
+                  minHeight: '40px',
+                  cursor: 'pointer',
+                  fontSize: '0.8125rem',
+                  color: '#94A3B8',
+                }}
               >
                 Clear all
               </button>
@@ -199,12 +214,24 @@ export function WeeklyPlanner({ planId, initialSlots, weekStartDate, weekOffset,
 
   return (
     <div>
-      {/* Header row */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      {/* Header row — wraps on mobile so the action buttons drop to their own
+          line under the week navigator instead of overflowing. */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+        <div className="flex items-center gap-2 md:gap-3">
           <a
             href={`/dashboard?week=${weekOffset - 1}`}
-            style={{ color: '#00A6A6', fontSize: '1.25rem', textDecoration: 'none', lineHeight: 1 }}
+            aria-label="Previous week"
+            style={{
+              color: '#00A6A6',
+              fontSize: '1.5rem',
+              textDecoration: 'none',
+              lineHeight: 1,
+              minWidth: '44px',
+              minHeight: '44px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
           >‹</a>
           <div>
             <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '1.5rem', fontWeight: 400, color: '#1A1A1A', margin: 0 }}>
@@ -218,23 +245,34 @@ export function WeeklyPlanner({ planId, initialSlots, weekStartDate, weekOffset,
           </div>
           <a
             href={`/dashboard?week=${weekOffset + 1}`}
-            style={{ color: '#00A6A6', fontSize: '1.25rem', textDecoration: 'none', lineHeight: 1 }}
+            aria-label="Next week"
+            style={{
+              color: '#00A6A6',
+              fontSize: '1.5rem',
+              textDecoration: 'none',
+              lineHeight: 1,
+              minWidth: '44px',
+              minHeight: '44px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
           >›</a>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div className="flex items-center gap-2 w-full md:w-auto">
           <a
             href={`/grocery?week=${weekOffset}`}
-            className="btn-ghost"
-            style={{ fontSize: '0.875rem', padding: '8px 16px', textDecoration: 'none' }}
+            className="btn-ghost flex-1 md:flex-initial"
+            style={{ fontSize: '0.875rem', textDecoration: 'none' }}
           >
             🛒 Grocery list
           </a>
           <button
             onClick={handleGenerate}
             disabled={isPending}
-            className="btn-accent"
-            style={{ fontSize: '0.9375rem', padding: '10px 20px', opacity: isPending ? 0.7 : 1 }}
+            className="btn-accent flex-1 md:flex-initial"
+            style={{ fontSize: '0.9375rem', opacity: isPending ? 0.7 : 1 }}
           >
             {isPending ? 'Generating…' : '✦ Generate week'}
           </button>
@@ -279,12 +317,17 @@ export function WeeklyPlanner({ planId, initialSlots, weekStartDate, weekOffset,
                   return (
                     <div
                       key={slot.id}
+                      // flex-wrap: allow the constraint pill to drop to a second
+                      // line on narrow screens instead of pushing the × clear
+                      // button off-canvas. minHeight stays consistent for
+                      // empty/filled visual balance.
                       style={{
-                        padding: '6px 16px',
+                        padding: '8px 16px',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '10px',
-                        minHeight: '40px',
+                        flexWrap: 'wrap',
+                        minHeight: '48px',
                       }}
                     >
                       <span className="label" style={{ width: '44px', flexShrink: 0 }}>{typeLabel}</span>
@@ -310,39 +353,47 @@ export function WeeklyPlanner({ planId, initialSlots, weekStartDate, weekOffset,
                       ) : (
                         <button
                           onClick={() => setActiveSlot(slot)}
+                          // .add-items-btn (defined in globals.css) handles the
+                          // teal-on-hover affordance via CSS so it doesn't rely
+                          // on onMouseEnter — touch devices never hover.
+                          className="add-items-btn"
                           style={{
                             flex: 1,
                             textAlign: 'left',
                             background: 'none',
                             border: '1.5px dashed #E2E8F0',
                             borderRadius: '8px',
-                            padding: '6px 12px',
+                            padding: '10px 14px',
                             color: '#94A3B8',
                             fontSize: '0.875rem',
                             cursor: 'pointer',
-                            transition: 'border-color 150ms, color 150ms',
+                            minHeight: '44px',
                           }}
-                          onMouseEnter={e => { e.currentTarget.style.borderColor = '#00A6A6'; e.currentTarget.style.color = '#00A6A6' }}
-                          onMouseLeave={e => { e.currentTarget.style.borderColor = '#E2E8F0'; e.currentTarget.style.color = '#94A3B8' }}
                         >
                           + Add {typeLabel.toLowerCase()}
                         </button>
                       )}
 
-                      {/* × clear button — always visible when slot has content */}
+                      {/* × clear button — always visible when slot has content.
+                          Was 2px padding (≈14px hit zone). Now a 36px square. */}
                       {(slot.note || slot.meals) && (
                         <button
                           onClick={() => handleClear(slot.id)}
                           title="Clear"
+                          aria-label="Clear slot"
                           style={{
                             flexShrink: 0,
                             background: 'none',
                             border: 'none',
                             color: '#CBD5E1',
                             cursor: 'pointer',
-                            fontSize: '1rem',
+                            fontSize: '1.25rem',
                             lineHeight: 1,
-                            padding: '2px 4px',
+                            width: '36px',
+                            height: '36px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
                           }}
                         >×</button>
                       )}

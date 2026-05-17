@@ -60,20 +60,44 @@ export function MealPicker({ myMeals, communityMeals, slotLabel, onSelect, onClo
           background: '#fff',
           borderRadius: '16px 16px 0 0',
           borderTop: '3px solid #00A6A6',
-          height: '80vh',
+          // 85dvh on browsers that report it (iOS 15.4+, Android) — adjusts when
+          // the soft keyboard opens so the input stays visible. Older browsers
+          // fall through to 80vh.
+          height: 'min(85dvh, 85vh)',
+          maxHeight: '85vh',
           display: 'flex', flexDirection: 'column',
           boxShadow: '0 -4px 24px rgba(0,0,0,0.12)',
         }}
         onClick={e => e.stopPropagation()}
       >
         {/* Handle + header */}
-        <div style={{ padding: '16px 20px 12px' }}>
-          <div style={{ width: '36px', height: '4px', background: '#E2E8F0', borderRadius: '2px', margin: '0 auto 14px' }} />
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-            <p style={{ fontFamily: 'Georgia, serif', fontSize: '1.125rem', color: '#1A1A1A' }}>
+        <div style={{ padding: '12px 20px 12px' }}>
+          {/* Drag-handle pill — purely decorative on web; signals "this is a
+              sheet you can dismiss" the way iOS does. */}
+          <div style={{ width: '40px', height: '4px', background: '#E2E8F0', borderRadius: '2px', margin: '0 auto 12px' }} />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', gap: '8px' }}>
+            <p style={{ fontFamily: 'Georgia, serif', fontSize: '1.125rem', color: '#1A1A1A', margin: 0 }}>
               {slotLabel}
             </p>
-            <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '1.25rem', color: '#94A3B8', cursor: 'pointer', lineHeight: 1 }}>×</button>
+            <button
+              onClick={onClose}
+              aria-label="Close"
+              style={{
+                background: 'none',
+                border: 'none',
+                fontSize: '1.5rem',
+                color: '#94A3B8',
+                cursor: 'pointer',
+                lineHeight: 1,
+                width: '44px',
+                height: '44px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                margin: '-8px -8px -8px 0',
+              }}
+            >×</button>
           </div>
 
           {/* Search */}
@@ -88,13 +112,14 @@ export function MealPicker({ myMeals, communityMeals, slotLabel, onSelect, onClo
           />
 
           {/* Source toggle */}
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '4px' }}>
+          <div className="flex gap-2 flex-wrap">
             {(['mine', 'all'] as const).map(s => (
               <button
                 key={s}
                 onClick={() => setSource(s)}
                 style={{
-                  padding: '5px 14px',
+                  padding: '8px 14px',
+                  minHeight: '36px',
                   borderRadius: '20px',
                   border: '1.5px solid',
                   borderColor: source === s ? '#00A6A6' : '#E2E8F0',
@@ -111,8 +136,17 @@ export function MealPicker({ myMeals, communityMeals, slotLabel, onSelect, onClo
           </div>
         </div>
 
-        {/* Scrollable list */}
-        <div style={{ overflowY: 'auto', flex: 1, padding: '0 20px 24px', WebkitOverflowScrolling: 'touch' }}>
+        {/* Scrollable list. paddingBottom clears the iOS home indicator on
+            devices that report a safe-area inset. */}
+        <div
+          style={{
+            overflowY: 'auto',
+            flex: 1,
+            padding: '0 20px',
+            paddingBottom: 'calc(24px + env(safe-area-inset-bottom, 0px))',
+            WebkitOverflowScrolling: 'touch',
+          }}
+        >
 
           {/* Preset options */}
           {!query && (
@@ -157,18 +191,21 @@ export function MealPicker({ myMeals, communityMeals, slotLabel, onSelect, onClo
                 <button
                   key={meal.id}
                   onClick={() => onSelect(meal.id, null)}
+                  // Hover affordance via CSS (.meal-picker-row) instead of
+                  // onMouseEnter — touch devices don't fire mouseenter, so the
+                  // inline approach was invisible on phone.
+                  className="meal-picker-row"
                   style={{
                     width: '100%',
                     textAlign: 'left',
-                    padding: '10px 12px',
-                    borderRadius: '8px',
+                    padding: '12px 14px',
+                    minHeight: '52px',
+                    borderRadius: '10px',
                     border: '1px solid #F1F5F9',
                     background: '#fff',
                     cursor: 'pointer',
                     transition: 'background 150ms',
                   }}
-                  onMouseEnter={e => (e.currentTarget.style.background = '#F8FAFB')}
-                  onMouseLeave={e => (e.currentTarget.style.background = '#fff')}
                 >
                   <span style={{ fontFamily: 'Georgia, serif', fontSize: '0.9375rem', color: '#1A1A1A' }}>
                     {meal.title}

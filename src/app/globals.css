@@ -28,15 +28,48 @@
   --radius-button: 8px;
   --radius-input:  8px;
   --radius-pill:   20px;
+
+  /* Mobile chrome metrics. The bottom tab bar lives at the viewport floor on
+     small screens; pages need padding-bottom so content isn't hidden behind it.
+     --mobile-nav-h is the bar's own height; --safe-bottom adds the home-indicator
+     inset on devices that report it. Both collapse to 0 at md: in :root below. */
+  --mobile-nav-h: 64px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top: env(safe-area-inset-top, 0px);
 }
 
 /* ─── Base styles ────────────────────────────────────────────────────────── */
+:root {
+  /* Disable iOS double-tap-to-zoom on the whole document. We rely on the
+     viewport meta for pinch-zoom to remain available for accessibility. */
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+}
+
+@media (min-width: 768px) {
+  :root {
+    /* Desktop has no bottom tab bar — zero out the offsets so pages don't
+       leave an empty band at the bottom. */
+    --mobile-nav-h: 0px;
+    --safe-bottom: 0px;
+  }
+}
+
 body {
   font-family: var(--font-sans);
   font-size: var(--text-body);
   color: var(--color-ink);
   background: #ffffff;
   -webkit-font-smoothing: antialiased;
+  /* Reserve space at the bottom for the mobile tab bar (md:hidden). On desktop
+     this collapses to 0 via the media query above. */
+  padding-bottom: calc(var(--mobile-nav-h) + var(--safe-bottom));
+}
+
+/* Utility: pages with their own fixed sticky footer (e.g. grocery share bar)
+   stack ABOVE the global tab bar. Apply .above-mobile-nav to position them. */
+.above-mobile-nav {
+  bottom: calc(var(--mobile-nav-h) + var(--safe-bottom)) !important;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -55,7 +88,10 @@ h1, h2, h3, h4, h5, h6 {
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 4px 16px rgba(0, 0, 0, 0.06);
   }
 
-  /* Buttons */
+  /* Buttons.
+     Mobile uses 12px vertical padding so the hit target clears Apple's 44px
+     guideline; md+ drops back to 10px since pointers don't need the margin.
+     min-height keeps targets honest even when callers shrink font-size inline. */
   .btn-primary {
     display: inline-flex;
     align-items: center;
@@ -65,11 +101,15 @@ h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-sans);
     font-size: var(--text-body);
     font-weight: 500;
-    padding: 10px 20px;
+    padding: 12px 20px;
+    min-height: 44px;
     border-radius: var(--radius-button);
     border: none;
     cursor: pointer;
     transition: background-color 150ms;
+  }
+  @media (min-width: 768px) {
+    .btn-primary { padding: 10px 20px; min-height: 0; }
   }
   .btn-primary:hover { background-color: var(--color-teal-dark); }
   .btn-primary:focus-visible {
@@ -86,7 +126,8 @@ h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-sans);
     font-size: var(--text-body);
     font-weight: 500;
-    padding: 10px 20px;
+    padding: 12px 20px;
+    min-height: 44px;
     border-radius: var(--radius-button);
     border: none;
     cursor: pointer;
@@ -96,6 +137,9 @@ h1, h2, h3, h4, h5, h6 {
   .btn-accent:focus-visible {
     outline: 2px solid var(--color-amber);
     outline-offset: 2px;
+  }
+  @media (min-width: 768px) {
+    .btn-accent { padding: 10px 20px; min-height: 0; }
   }
 
   .btn-secondary {
@@ -107,13 +151,17 @@ h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-sans);
     font-size: var(--text-body);
     font-weight: 500;
-    padding: 10px 20px;
+    padding: 12px 20px;
+    min-height: 44px;
     border-radius: var(--radius-button);
     border: 1px solid #e2e8f0;
     cursor: pointer;
     transition: background-color 150ms;
   }
   .btn-secondary:hover { background-color: #e9eaec; }
+  @media (min-width: 768px) {
+    .btn-secondary { padding: 10px 20px; min-height: 0; }
+  }
 
   .btn-ghost {
     display: inline-flex;
@@ -124,25 +172,38 @@ h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-sans);
     font-size: var(--text-body);
     font-weight: 500;
-    padding: 10px 20px;
+    padding: 12px 20px;
+    min-height: 44px;
     border-radius: var(--radius-button);
     border: 1.5px solid var(--color-teal);
     cursor: pointer;
     transition: background-color 150ms;
   }
   .btn-ghost:hover { background-color: var(--color-teal-light); }
+  @media (min-width: 768px) {
+    .btn-ghost { padding: 10px 20px; min-height: 0; }
+  }
 
-  /* Input — visible border, teal focus */
+  /* Input — visible border, teal focus.
+     font-size:16px is deliberate: anything smaller triggers iOS Safari's
+     zoom-on-focus, which yanks the viewport around when the keyboard appears.
+     We override down to var(--text-body) on md+ where that rule doesn't apply. */
   .input {
     width: 100%;
     border: 1.5px solid #cbd5e1;
     border-radius: var(--radius-input);
-    padding: 10px 12px;
+    padding: 12px 14px;
     font-family: var(--font-sans);
-    font-size: var(--text-body);
+    font-size: 16px;
     color: var(--color-ink);
     background: #ffffff;
     transition: border-color 150ms, box-shadow 150ms;
+  }
+  @media (min-width: 768px) {
+    .input {
+      padding: 10px 12px;
+      font-size: var(--text-body);
+    }
   }
   .input::placeholder { color: #94a3b8; }
   .input:focus {
@@ -231,6 +292,44 @@ h1, h2, h3, h4, h5, h6 {
   }
   .toggle-checkbox:checked + .toggle-track::after {
     transform: translateX(20px);
+  }
+
+  /* Tappable row in the MealPicker bottom sheet. Mirrors what
+     onMouseEnter/onMouseLeave used to do, but works on touch. */
+  .meal-picker-row:hover,
+  .meal-picker-row:focus-visible {
+    background: #F8FAFB !important;
+    outline: none;
+  }
+  .meal-picker-row:active {
+    background: #E0F5F5 !important;
+  }
+
+  /* Dashed "+ Add" button used in GroceryList / WeeklyPlanner empty slots.
+     Hover-only color shifts via inline onMouseEnter were invisible on touch;
+     CSS :hover/:focus-visible covers pointer devices without breaking touch. */
+  .add-items-btn {
+    transition: border-color 150ms, color 150ms, background-color 150ms;
+  }
+  .add-items-btn:hover,
+  .add-items-btn:focus-visible {
+    border-color: var(--color-teal) !important;
+    color: var(--color-teal) !important;
+    outline: none;
+  }
+  .add-items-btn:active {
+    background-color: var(--color-teal-light) !important;
+  }
+
+  /* Round action buttons next to a meal card (edit, copy-to-collection).
+     44px on mobile to clear Apple HIG; 32px on desktop where pointers are exact.
+     Used by EditMealLink + MealsList copy button. */
+  .meal-action-btn {
+    width: 44px;
+    height: 44px;
+  }
+  @media (min-width: 768px) {
+    .meal-action-btn { width: 32px; height: 32px; }
   }
 
   /* Grocery checkbox — teal circle, white check */
