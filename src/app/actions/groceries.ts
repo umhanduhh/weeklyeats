@@ -46,29 +46,49 @@ export async function getGroceryList(planId: string): Promise<{ listId: string; 
 
 // ─── Generate grocery list from plan meals ────────────────────────────────────
 
+// Tag for filtering in Vercel function logs: `vercel logs --filter "[grocery-gen]"`
+// or grep the dashboard log stream for this prefix. Kept short so it's easy to type.
+const LOG = '[grocery-gen]'
+function trace(stage: string, info: Record<string, unknown>) {
+  // console.error (not .log) so Vercel surfaces it as an Error-level log even
+  // on the Hobby plan, which suppresses .log in some runtimes.
+  console.error(`${LOG} ${stage}`, JSON.stringify(info))
+}
+
 export async function generateGroceryList(planId: string): Promise<{ error?: string }> {
   try {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
+  trace('start', { planId, userId: user.id })
+
   // Get all meal IDs from filled slots
-  const { data: slots } = await supabase
+  const { data: slots, error: slotsError } = await supabase
     .from('weekly_plan_slots')
     .select('meal_id')
     .eq('plan_id', planId)
     .not('meal_id', 'is', null)
 
+  if (slotsError) {
+    trace('slots-query-failed', { code: slotsError.code, message: slotsError.message })
+    return { error: `Could not load planner: ${slotsError.message}` }
+  }
   if (!slots || slots.length === 0) return { error: 'No meals assigned this week yet.' }
 
   const mealIds = slots.map(s => s.meal_id).filter(Boolean) as string[]
+  trace('slots-found', { slotCount: slots.length, mealIdCount: mealIds.length })
 
   // Fetch meals directly
-  const { data: meals } = await supabase
+  const { data: meals, error: mealsError } = await supabase
     .from('meals')
     .select('id, title, ingredients')
     .in('id', mealIds)
 
+  if (mealsError) {
+    trace('meals-query-failed', { code: mealsError.code, message: mealsError.message })
+    return { error: `Could not load meals: ${mealsError.message}` }
+  }
   if (!meals || meals.length === 0) return { error: 'No meals found.' }
 
   // Collect ingredients per-meal so we can pass meal context to Claude and
@@ -98,10 +118,9 @@ export async function generateGroceryList(planId: string): Promise<{ error?: str
     .join('\n\n')
   const knownTitles = ingredientsByMeal.map(m => m.title)
 
+  trace('prompt-built', { mealCount: ingredientsByMeal.length, promptChars: mealSections.length })
+
   // Use Claude to parse, deduplicate, categorize, and attribute to source meals.
-  // max_tokens raised from 2048 → 4096: per-item `meals` arrays inflated the
-  // response payload, and a full week of meals was truncating mid-array — the
-  // unterminated JSON then hit the catch block as a parse failure.
   const anthropic = new Anthropic()
   const message = await anthropic.messages.create({
     model: 'claude-haiku-4-5-20251001',
@@ -136,7 +155,18 @@ ${mealSections}`,
     }],
   })
 
-  const raw = message.content[0].type === 'text' ? message.content[0].text : '[]'
+  const raw = message.content[0].type === 'text' ? message.content[0].text : ''
+  // Log everything that distinguishes "Claude truncated my response" from
+  // "Claude returned prose" from "the regex doesn't fit the response shape".
+  // stop_reason === 'max_tokens' is THE signal that we need a bigger budget.
+  trace('claude-response', {
+    stop_reason: message.stop_reason,
+    input_tokens: message.usage?.input_tokens,
+    output_tokens: message.usage?.output_tokens,
+    rawLen: raw.length,
+    rawPreview: raw.slice(0, 300),
+    rawTail: raw.slice(-100),
+  })
 
   // Claude occasionally wraps the JSON in prose ("Here's the parsed list…") or
   // a fenced code block. Strip fences first, then carve out the outermost
@@ -149,12 +179,28 @@ ${mealSections}`,
   let parsed: Array<{ ingredient: string; category: string; meals?: unknown }>
   try {
     parsed = JSON.parse(jsonText)
-  } catch {
-    return { error: 'Could not parse the grocery list. Try again.' }
+  } catch (parseErr) {
+    trace('parse-failed', {
+      stop_reason: message.stop_reason,
+      arrayMatched: !!arrayMatch,
+      jsonTextLen: jsonText.length,
+      jsonTextHead: jsonText.slice(0, 200),
+      jsonTextTail: jsonText.slice(-100),
+      parseError: parseErr instanceof Error ? parseErr.message : String(parseErr),
+    })
+    // Surface the structural cause in the UI so the next failure is
+    // diagnosable without digging into Vercel logs. Trim because the banner
+    // wraps awkwardly past ~200 chars.
+    const reason = message.stop_reason === 'max_tokens'
+      ? 'Claude ran out of tokens before finishing the list.'
+      : `Claude returned text that didn't contain a JSON array.`
+    return { error: `Could not parse the grocery list — ${reason} (stop_reason: ${message.stop_reason}; response starts: "${raw.slice(0, 80).replace(/\s+/g, ' ')}…")` }
   }
   if (!Array.isArray(parsed)) {
-    return { error: 'Could not parse the grocery list. Try again.' }
+    trace('parsed-not-array', { typeofParsed: typeof parsed })
+    return { error: 'Could not parse the grocery list — response was not a JSON array.' }
   }
+  trace('parsed-ok', { itemCount: parsed.length, sample: parsed[0] })
 
   // Normalize the meals attribution: drop anything that isn't a string, drop
   // titles Claude hallucinated, and dedupe. Anything left becomes the row's
@@ -169,17 +215,19 @@ ${mealSections}`,
   }
 
   // Look up the plan's week_start_date
-  const { data: plan } = await supabase
+  const { data: plan, error: planError } = await supabase
     .from('weekly_plans')
     .select('week_start_date')
     .eq('id', planId)
     .single()
+  if (planError) trace('plan-lookup-failed', { code: planError.code, message: planError.message })
 
   // Delete any existing list for this plan
-  await supabase
+  const { error: deleteError } = await supabase
     .from('grocery_lists')
     .delete()
     .eq('plan_id', planId)
+  if (deleteError) trace('delete-old-list-failed', { code: deleteError.code, message: deleteError.message })
 
   // Create new list
   const { data: list, error: listError } = await supabase
@@ -188,25 +236,52 @@ ${mealSections}`,
     .select('id')
     .single()
 
-  if (listError || !list) return { error: `Could not create grocery list: ${listError?.message ?? 'unknown error'}` }
+  if (listError || !list) {
+    trace('list-insert-failed', {
+      code: listError?.code,
+      message: listError?.message,
+      details: listError?.details,
+      hint: listError?.hint,
+    })
+    return { error: `Could not create grocery list: ${listError?.message ?? 'unknown error'}${listError?.code ? ` (code ${listError.code})` : ''}` }
+  }
 
   // Insert items
-  const { error: itemsError } = await supabase.from('grocery_items').insert(
-    parsed.map((item, i) => ({
-      list_id: list.id,
-      ingredient: item.ingredient,
-      category: item.category ?? 'Other',
-      position: i,
-      meals: sanitizeMeals(item.meals),
-    }))
-  )
+  const itemRows = parsed.map((item, i) => ({
+    list_id: list.id,
+    ingredient: item.ingredient,
+    category: item.category ?? 'Other',
+    position: i,
+    meals: sanitizeMeals(item.meals),
+  }))
+  trace('inserting-items', { count: itemRows.length, sampleRow: itemRows[0] })
 
-  if (itemsError) return { error: `Could not save items: ${itemsError.message}` }
+  const { error: itemsError } = await supabase.from('grocery_items').insert(itemRows)
 
+  if (itemsError) {
+    // The most likely culprit for this failing is the `meals` column not
+    // existing (migration 2026_05_17_grocery_meals.sql not run). Code is
+    // PostgREST's; message contains the underlying Postgres complaint.
+    trace('items-insert-failed', {
+      code: itemsError.code,
+      message: itemsError.message,
+      details: itemsError.details,
+      hint: itemsError.hint,
+    })
+    return { error: `Could not save items: ${itemsError.message}${itemsError.code ? ` (code ${itemsError.code})` : ''}` }
+  }
+
+  trace('done', { itemsSaved: itemRows.length })
   revalidatePath('/grocery')
   return {}
   } catch (e) {
-    return { error: `Unexpected error: ${e instanceof Error ? e.message : String(e)}` }
+    // Anything that bypassed the explicit error handling above: Anthropic SDK
+    // throws (rate limit, auth, 5xx), network blips, etc. Log full stack for
+    // post-mortem; return a trimmed message to the UI.
+    const message = e instanceof Error ? e.message : String(e)
+    const stack = e instanceof Error ? e.stack : undefined
+    trace('unexpected-throw', { message, stack })
+    return { error: `Unexpected error: ${message}` }
   }
 }
 
