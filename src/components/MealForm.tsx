@@ -337,77 +337,81 @@ export function MealForm({
         </div>
 
         {/* Macros — edit mode only. Leave blank to keep whatever the
-            Calculate macros button last saved (or null for not-yet-computed). */}
+            Calculate macros button last saved (or null for not-yet-computed).
+            Layout: 2 cols on mobile (5 cols at 1fr each becomes ~60px wide on
+            a 375px viewport — labels truncate, inputs look like a calculator).
+            Bumps to 5 cols at md+. inputMode='numeric' brings up the number
+            pad on phones rather than the full keyboard. */}
         {isEdit && (
           <div className="border-t pt-4" style={{ borderColor: '#F1F5F9' }}>
             <p className="label mb-1">Macros (per serving)</p>
             <p className="mb-3" style={{ fontSize: '0.8125rem', color: '#94A3B8' }}>
               Override the auto-calculated values. Leave any field blank to clear it.
             </p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px' }}>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
               <label style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <span style={{ fontSize: '0.75rem', color: '#64748B' }}>Servings</span>
                 <input
                   type="number"
+                  inputMode="numeric"
                   name="servings"
                   min={1}
                   max={50}
                   value={servings}
                   onChange={e => setServings(e.target.value)}
                   className="input"
-                  style={{ padding: '8px 10px', fontSize: '0.875rem' }}
                 />
               </label>
               <label style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <span style={{ fontSize: '0.75rem', color: '#64748B' }}>Calories</span>
                 <input
                   type="number"
+                  inputMode="numeric"
                   name="calories"
                   min={0}
                   max={5000}
                   value={calories}
                   onChange={e => setCalories(e.target.value)}
                   className="input"
-                  style={{ padding: '8px 10px', fontSize: '0.875rem' }}
                 />
               </label>
               <label style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <span style={{ fontSize: '0.75rem', color: '#64748B' }}>Protein (g)</span>
                 <input
                   type="number"
+                  inputMode="numeric"
                   name="protein_g"
                   min={0}
                   max={500}
                   value={proteinG}
                   onChange={e => setProteinG(e.target.value)}
                   className="input"
-                  style={{ padding: '8px 10px', fontSize: '0.875rem' }}
                 />
               </label>
               <label style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <span style={{ fontSize: '0.75rem', color: '#64748B' }}>Carbs (g)</span>
                 <input
                   type="number"
+                  inputMode="numeric"
                   name="carbs_g"
                   min={0}
                   max={500}
                   value={carbsG}
                   onChange={e => setCarbsG(e.target.value)}
                   className="input"
-                  style={{ padding: '8px 10px', fontSize: '0.875rem' }}
                 />
               </label>
               <label style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <span style={{ fontSize: '0.75rem', color: '#64748B' }}>Fat (g)</span>
                 <input
                   type="number"
+                  inputMode="numeric"
                   name="fat_g"
                   min={0}
                   max={500}
                   value={fatG}
                   onChange={e => setFatG(e.target.value)}
                   className="input"
-                  style={{ padding: '8px 10px', fontSize: '0.875rem' }}
                 />
               </label>
             </div>

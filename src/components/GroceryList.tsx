@@ -233,12 +233,30 @@ export function GroceryList({ planId, listId: initialListId, weekLabel, weekOffs
   // ── Full list ────────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ paddingBottom: '80px' }}>
+    // 96px bottom padding clears both the sticky share bar (~56px) and the
+    // global mobile tab bar (--mobile-nav-h + --safe-bottom, handled in body).
+    // We add page-local breathing room here too so the last item isn't visually
+    // pinned against the share bar.
+    <div style={{ paddingBottom: '96px' }}>
 
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <a href={`/grocery?week=${weekOffset - 1}`} style={{ color: '#00A6A6', fontSize: '1.25rem', textDecoration: 'none' }}>‹</a>
+      {/* Header — flex-wrap so on narrow viewports the Regenerate button drops
+          beneath the week navigator instead of pushing it off-screen. */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+        <div className="flex items-center gap-2 md:gap-3">
+          <a
+            href={`/grocery?week=${weekOffset - 1}`}
+            aria-label="Previous week"
+            style={{
+              color: '#00A6A6',
+              fontSize: '1.5rem',
+              textDecoration: 'none',
+              minWidth: '44px',
+              minHeight: '44px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >‹</a>
           <div>
             <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '1.5rem', fontWeight: 400, color: '#1A1A1A', margin: 0 }}>
               {weekLabel}
@@ -247,7 +265,20 @@ export function GroceryList({ planId, listId: initialListId, weekLabel, weekOffs
               ← Back to planner
             </a>
           </div>
-          <a href={`/grocery?week=${weekOffset + 1}`} style={{ color: '#00A6A6', fontSize: '1.25rem', textDecoration: 'none' }}>›</a>
+          <a
+            href={`/grocery?week=${weekOffset + 1}`}
+            aria-label="Next week"
+            style={{
+              color: '#00A6A6',
+              fontSize: '1.5rem',
+              textDecoration: 'none',
+              minWidth: '44px',
+              minHeight: '44px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >›</a>
         </div>
 
         <button
@@ -257,7 +288,8 @@ export function GroceryList({ planId, listId: initialListId, weekLabel, weekOffs
             background: 'none',
             border: '1.5px solid #E2E8F0',
             borderRadius: '8px',
-            padding: '8px 14px',
+            padding: '10px 14px',
+            minHeight: '44px',
             fontSize: '0.875rem',
             color: '#64748B',
             cursor: 'pointer',
@@ -274,29 +306,38 @@ export function GroceryList({ planId, listId: initialListId, weekLabel, weekOffs
         </div>
       )}
 
-      {/* Progress + group toggle */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{ width: '120px', height: '6px', background: '#E2E8F0', borderRadius: '3px', overflow: 'hidden' }}>
+      {/* Progress + group toggle.
+          Mobile: progress bar fills remaining space; toggle wraps below if needed.
+          Desktop: same row, progress on left, toggle on right. */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div
+            // flex-1 so the bar grows on mobile instead of being a stub.
+            className="flex-1 max-w-[160px]"
+            style={{ height: '8px', background: '#E2E8F0', borderRadius: '4px', overflow: 'hidden' }}
+          >
             <div style={{
               width: `${total > 0 ? (checkedCount / total) * 100 : 0}%`,
               height: '100%',
               background: '#00A6A6',
-              borderRadius: '3px',
+              borderRadius: '4px',
               transition: 'width 300ms',
             }} />
           </div>
-          <span style={{ fontSize: '0.8125rem', color: '#64748B' }}>{checkedCount} of {total}</span>
+          <span style={{ fontSize: '0.8125rem', color: '#64748B', whiteSpace: 'nowrap' }}>{checkedCount} of {total}</span>
         </div>
 
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
           {(['category', 'store', 'meal'] as const).map(opt => (
+        <div className="flex gap-2">
+          {(['category', 'store'] as const).map(opt => (
             <button
               key={opt}
               onClick={() => setGroupBy(opt)}
               aria-pressed={groupBy === opt}
               style={{
-                padding: '4px 12px',
+                padding: '8px 14px',
+                minHeight: '36px',
                 borderRadius: '20px',
                 border: '1.5px solid',
                 borderColor: groupBy === opt ? '#00A6A6' : '#E2E8F0',
@@ -332,55 +373,83 @@ export function GroceryList({ planId, listId: initialListId, weekLabel, weekOffs
                   display: 'flex',
                   alignItems: 'center',
                   gap: '10px',
-                  padding: '9px 16px',
+                  // More generous row padding on mobile so checkbox / delete
+                  // hit zones don't bleed into adjacent rows.
+                  padding: '12px 16px',
                   borderBottom: idx < group.items.length - 1 ? '1px solid #F8FAFB' : 'none',
                   opacity: item.checked ? 0.5 : 1,
                   transition: 'opacity 200ms',
                 }}
               >
-                {/* Checkbox */}
+                {/* Checkbox — visually 22px, but the surrounding hit area is
+                    44x44 via padding so it's reliably tappable on touch.  */}
                 <button
                   onClick={() => handleToggle(item)}
+                  aria-label={item.checked ? 'Mark as not picked up' : 'Mark as picked up'}
+                  aria-pressed={item.checked}
                   style={{
-                    width: '20px',
-                    height: '20px',
-                    borderRadius: '5px',
-                    border: item.checked ? '2px solid #00A6A6' : '2px solid #CBD5E1',
-                    background: item.checked ? '#00A6A6' : '#fff',
-                    flexShrink: 0,
-                    cursor: 'pointer',
+                    width: '44px',
+                    height: '44px',
+                    margin: '-11px 0',
+                    background: 'transparent',
+                    border: 'none',
+                    padding: 0,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    color: '#fff',
-                    fontSize: '0.75rem',
-                    transition: 'all 150ms',
+                    cursor: 'pointer',
+                    flexShrink: 0,
                   }}
                 >
-                  {item.checked ? '✓' : ''}
+                  <span
+                    aria-hidden
+                    style={{
+                      width: '22px',
+                      height: '22px',
+                      borderRadius: '6px',
+                      border: item.checked ? '2px solid #00A6A6' : '2px solid #CBD5E1',
+                      background: item.checked ? '#00A6A6' : '#fff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#fff',
+                      fontSize: '0.8125rem',
+                      transition: 'all 150ms',
+                    }}
+                  >
+                    {item.checked ? '✓' : ''}
+                  </span>
                 </button>
 
-                {/* Ingredient */}
-                <span style={{
-                  flex: 1,
-                  fontFamily: 'Georgia, serif',
-                  fontSize: '0.9375rem',
-                  color: '#1A1A1A',
-                  textDecoration: item.checked ? 'line-through #94A3B8' : 'none',
-                }}>
+                {/* Ingredient — min-w-0 lets text truncate instead of pushing
+                    the store/delete columns off the right edge. */}
+                <span
+                  className="flex-1 min-w-0"
+                  style={{
+                    fontFamily: 'Georgia, serif',
+                    fontSize: '0.9375rem',
+                    color: '#1A1A1A',
+                    textDecoration: item.checked ? 'line-through #94A3B8' : 'none',
+                    overflowWrap: 'break-word',
+                  }}
+                >
                   {item.ingredient}
                 </span>
 
-                {/* Category picker — shown in store view */}
+                {/* Category picker — shown in store view. Bigger hit padding
+                    on mobile; the native <select> control already gives an iOS
+                    sheet on tap. */}
                 {groupBy === 'store' && (
                   <select
                     value={item.category}
                     onChange={e => handleCategory(item, e.target.value)}
                     style={{
-                      fontSize: '0.6875rem',
-                      padding: '2px 6px',
+                      fontSize: '0.75rem',
+                      padding: '8px 8px',
+                      minHeight: '36px',
+                      maxWidth: '120px',
                       border: '1px solid #E2E8F0',
-                      borderRadius: '6px',
+                      borderRadius: '8px',
                       background: '#fff',
                       color: '#64748B',
                       cursor: 'pointer',
@@ -408,11 +477,13 @@ export function GroceryList({ planId, listId: initialListId, weekLabel, weekOffs
                         if (e.key === 'Enter') commitStore(item.id)
                         if (e.key === 'Escape') setEditingStoreId(null)
                       }}
-                      placeholder="Store name…"
+                      placeholder="Store…"
                       style={{
-                        width: '110px',
-                        padding: '3px 8px',
-                        fontSize: '0.75rem',
+                        // Was fixed 110px which overflowed narrow rows.
+                        // Now flexes to a reasonable cap that still fits 375px.
+                        width: 'min(140px, 40vw)',
+                        padding: '8px 10px',
+                        fontSize: '16px',
                         border: '1.5px solid #00A6A6',
                         borderRadius: '20px',
                         outline: 'none',
@@ -427,11 +498,15 @@ export function GroceryList({ planId, listId: initialListId, weekLabel, weekOffs
                         background: item.store ? '#E0F5F5' : 'none',
                         border: item.store ? '1px solid #00A6A6' : '1px dashed #CBD5E1',
                         borderRadius: '20px',
-                        padding: '2px 8px',
+                        padding: '6px 12px',
+                        minHeight: '32px',
                         fontSize: '0.75rem',
                         color: item.store ? '#007A7A' : '#94A3B8',
                         cursor: 'pointer',
                         whiteSpace: 'nowrap',
+                        maxWidth: '120px',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
                       }}
                     >
                       {item.store ?? '+ store'}
@@ -439,19 +514,25 @@ export function GroceryList({ planId, listId: initialListId, weekLabel, weekOffs
                   )
                 )}
 
-                {/* Delete */}
+                {/* Delete — was a tiny 12px × visual with 2px padding (~16px
+                    hit zone). Now a 36px square so it's actually tappable. */}
                 <button
                   onClick={() => handleDelete(item.id)}
                   title="Remove"
+                  aria-label="Remove item"
                   style={{
                     flexShrink: 0,
                     background: 'none',
                     border: 'none',
                     color: '#CBD5E1',
                     cursor: 'pointer',
-                    fontSize: '1rem',
+                    fontSize: '1.25rem',
                     lineHeight: 1,
-                    padding: '2px 4px',
+                    width: '36px',
+                    height: '36px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                   }}
                 >×</button>
               </div>
@@ -513,46 +594,46 @@ export function GroceryList({ planId, listId: initialListId, weekLabel, weekOffs
         ) : (
           <button
             onClick={() => setAddingItems(true)}
+            // Was hover-tinted via onMouseEnter/Leave — touch has no hover, so
+            // the affordance vanished on phone. Use :hover/:focus-visible CSS
+            // instead, applied as a className so styling is touch-friendly.
+            className="add-items-btn"
             style={{
               width: '100%',
-              padding: '10px',
+              padding: '14px',
               background: 'none',
               border: '1.5px dashed #E2E8F0',
               borderRadius: '10px',
               color: '#94A3B8',
-              fontSize: '0.875rem',
+              fontSize: '0.9375rem',
               cursor: 'pointer',
-              transition: 'border-color 150ms, color 150ms',
+              minHeight: '52px',
             }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = '#00A6A6'; e.currentTarget.style.color = '#00A6A6' }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = '#E2E8F0'; e.currentTarget.style.color = '#94A3B8' }}
           >
             + Add items
           </button>
         )}
       </div>
 
-      {/* Sticky share bar */}
-      <div style={{
-        position: 'fixed',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        padding: '12px 16px env(safe-area-inset-bottom, 0px)',
-        background: 'rgba(248, 250, 251, 0.95)',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
-        borderTop: '1px solid #E2E8F0',
-        display: 'flex',
-        justifyContent: 'center',
-        zIndex: 30,
-      }}>
+      {/* Sticky share bar — sits ABOVE the global mobile tab bar (and at the
+          true floor on desktop, since --mobile-nav-h collapses to 0 there). */}
+      <div
+        className="fixed left-0 right-0 above-mobile-nav z-30 flex justify-center"
+        style={{
+          bottom: 0,
+          padding: '12px 16px',
+          background: 'rgba(248, 250, 251, 0.95)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
+          borderTop: '1px solid #E2E8F0',
+        }}
+      >
         <button
           onClick={handleShare}
           className="btn-accent"
-          style={{ width: '100%', maxWidth: '560px', fontSize: '0.9375rem', padding: '12px 24px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+          style={{ width: '100%', maxWidth: '560px', fontSize: '0.9375rem', padding: '14px 24px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
         >
-          <span>📤</span>
+          <span aria-hidden>📤</span>
           {shareStatus === 'copied' ? 'Copied to clipboard!' : 'Share grocery list'}
         </button>
       </div>

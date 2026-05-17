@@ -147,22 +147,24 @@ export function MealCard({ meal, action, canCalculateMacros = false }: Props) {
               <span style={{ color: '#94A3B8' }}> · serves {localMacros.servings}</span>
             </div>
           ) : canCalculateMacros ? (
-            <div className="mt-1 flex items-center gap-2">
+            <div className="mt-2 flex items-center gap-2 flex-wrap">
               <button
                 type="button"
                 onClick={handleCalculate}
                 disabled={calcPending}
                 style={{
-                  fontSize: '0.75rem',
+                  // 32px tall on mobile clears comfortable touch; smaller looks
+                  // misclickable next to ingredients.
+                  fontSize: '0.8125rem',
                   color: '#00A6A6',
                   background: 'transparent',
                   border: '1px dashed #B6E2E2',
-                  borderRadius: '6px',
-                  padding: '2px 8px',
+                  borderRadius: '8px',
+                  padding: '6px 12px',
                   cursor: calcPending ? 'wait' : 'pointer',
                 }}
               >
-                {calcPending ? 'Calculating…' : 'Calculate macros'}
+                {calcPending ? 'Calculating…' : '✦ Calculate macros'}
               </button>
               {calcError && (
                 <span style={{ fontSize: '0.75rem', color: '#991B1B' }}>{calcError}</span>

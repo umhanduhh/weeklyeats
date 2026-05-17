@@ -6,9 +6,10 @@ export function EditMealLink({ mealId }: { mealId: string }) {
       href={`/meals/${mealId}/edit`}
       title="Edit meal"
       aria-label="Edit meal"
+      // 44px tap target on mobile (Apple HIG min), 32px on desktop where
+      // pointers don't need the margin.
+      className="meal-action-btn"
       style={{
-        width: '32px',
-        height: '32px',
         borderRadius: '50%',
         background: '#E0F5F5',
         color: '#007A7A',

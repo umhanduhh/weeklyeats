@@ -98,19 +98,22 @@ export function MealsList({ meals, mode, currentUserId }: Props) {
                 type="button"
                 onClick={() => setSelected(new Set())}
                 style={{
-                  fontSize: '0.75rem',
+                  fontSize: '0.8125rem',
                   color: '#00A6A6',
                   background: 'transparent',
                   border: 'none',
                   cursor: 'pointer',
-                  padding: 0,
+                  // Negative margin trick: padded out to a tappable size on touch,
+                  // but visually the text still aligns with the label on the left.
+                  padding: '8px 4px',
+                  margin: '-8px -4px',
                 }}
               >
                 Clear ({selected.size})
               </button>
             )}
           </div>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-2">
             {tagFreq.map(([tag, count]) => {
               const isOn = selected.has(tag)
               return (
@@ -124,7 +127,11 @@ export function MealsList({ meals, mode, currentUserId }: Props) {
                     border: isOn ? '2px solid #1A1A1A' : '2px solid transparent',
                     opacity: selected.size > 0 && !isOn ? 0.55 : 1,
                     fontWeight: isOn ? 600 : 500,
-                    padding: isOn ? '2px 8px' : '3px 9px',
+                    // Roomier pills: comfortable to tap on phone, still compact
+                    // on desktop. Inner padding shrinks by 1px when selected so
+                    // the 2px border doesn't push neighbors around.
+                    padding: isOn ? '7px 12px' : '8px 13px',
+                    fontSize: '0.8125rem',
                     fontVariantNumeric: 'tabular-nums',
                   }}
                   aria-pressed={isOn}
@@ -166,9 +173,11 @@ export function MealsList({ meals, mode, currentUserId }: Props) {
                     <button
                       type="submit"
                       title="Add to my collection"
+                      aria-label="Add to my collection"
+                      // .meal-action-btn: 44px on mobile, 32px on desktop —
+                      // same sizing as the EditMealLink icon button.
+                      className="meal-action-btn"
                       style={{
-                        width: '32px',
-                        height: '32px',
                         borderRadius: '50%',
                         background: '#E0F5F5',
                         color: '#00A6A6',

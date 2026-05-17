@@ -103,8 +103,12 @@ export default async function MealsPage({ searchParams }: { searchParams: Search
           </div>
         )}
 
-        {/* Tabs + Add button */}
-        <div className="flex items-center justify-between mb-1">
+        {/* Tabs + Add buttons.
+            Desktop: single row, tabs left, buttons right.
+            Mobile: tabs stay on top in a swipeable-feeling row; add buttons
+            wrap below as a full-width pair so they're easy to tap and don't
+            cram against the tabs. */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-0 mb-1">
           <div className="flex border-b" style={{ borderColor: '#E2E8F0' }}>
             <Link
               href="/meals?tab=mine"
@@ -135,11 +139,28 @@ export default async function MealsPage({ searchParams }: { searchParams: Search
           </div>
 
           {tab === 'mine' && (
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <Link href="/meals/bulk-import" style={{ padding: '8px 14px', fontSize: '0.875rem', border: '1.5px solid #E2E8F0', borderRadius: '8px', color: '#64748B', textDecoration: 'none', background: '#fff' }}>
+            <div className="flex gap-2">
+              <Link
+                href="/meals/bulk-import"
+                className="flex-1 md:flex-initial inline-flex items-center justify-center"
+                style={{
+                  padding: '10px 14px',
+                  fontSize: '0.875rem',
+                  border: '1.5px solid #E2E8F0',
+                  borderRadius: '8px',
+                  color: '#64748B',
+                  textDecoration: 'none',
+                  background: '#fff',
+                  minHeight: '44px',
+                }}
+              >
                 ↑ Bulk import
               </Link>
-              <Link href="/meals/new" className="btn-primary" style={{ padding: '8px 16px', fontSize: '0.875rem' }}>
+              <Link
+                href="/meals/new"
+                className="btn-primary flex-1 md:flex-initial"
+                style={{ fontSize: '0.875rem' }}
+              >
                 + Add meal
               </Link>
             </div>
