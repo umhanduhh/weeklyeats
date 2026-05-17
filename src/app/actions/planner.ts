@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { NON_ENTREE_TAGS } from '@/lib/tags'
 
 // ─── Get or create plan + slots ───────────────────────────────────────────────
 
@@ -153,12 +154,21 @@ export async function generateWeek(planId: string) {
   if (!emptySlots || emptySlots.length === 0) return
 
   // Get user's meals
-  const { data: allMeals } = await supabase
+  const { data: rawMeals } = await supabase
     .from('meals')
     .select('id, title, tags, last_planned_date')
     .eq('user_id', user.id)
 
-  if (!allMeals || allMeals.length === 0) return
+  if (!rawMeals || rawMeals.length === 0) return
+
+  // Filter out anything tagged as a dessert (or any future non-entree tag) up
+  // front — no slot constraint can override this; you don't eat carrot cake
+  // for dinner. The user can still hand-pick a dessert via MealPicker.
+  const allMeals = rawMeals.filter(
+    m => !(m.tags ?? []).some((t: string) => NON_ENTREE_TAGS.includes(t)),
+  )
+
+  if (allMeals.length === 0) return
 
   // Separate recently used (last 14 days) from available
   const twoWeeksAgo = new Date()

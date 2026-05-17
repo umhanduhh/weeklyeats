@@ -13,6 +13,11 @@ export type GroceryItem = {
   store: string | null
   checked: boolean
   position: number
+  /** Meal titles that contributed this item — set on auto-generation, empty
+   *  for items added freeform. Stored as text[] (a snapshot of titles) so the
+   *  grocery list stays readable even if the underlying meal is later edited
+   *  or deleted. Used by the "by meal" grouping in the UI. */
+  meals: string[]
 }
 
 // ─── Get grocery list for a plan ─────────────────────────────────────────────
@@ -66,37 +71,49 @@ export async function generateGroceryList(planId: string): Promise<{ error?: str
 
   if (!meals || meals.length === 0) return { error: 'No meals found.' }
 
-  // Collect all ingredients — stored as JSONB array
-  const allIngredients: string[] = []
+  // Collect ingredients per-meal so we can pass meal context to Claude and
+  // remember which meal(s) each grocery item came from after deduplication.
+  const ingredientsByMeal: Array<{ title: string; lines: string[] }> = []
   for (const meal of meals) {
+    const lines: string[] = []
     const ing = meal.ingredients
     if (Array.isArray(ing)) {
       for (const i of ing) {
-        if (typeof i === 'string') allIngredients.push(i)
-        else if (i && typeof i === 'object' && 'text' in i && typeof i.text === 'string') allIngredients.push(i.text)
+        if (typeof i === 'string') lines.push(i)
+        else if (i && typeof i === 'object' && 'text' in i && typeof i.text === 'string') lines.push(i.text)
       }
     } else if (typeof ing === 'string' && ing.trim()) {
-      allIngredients.push(...ing.split('\n').filter(Boolean))
+      lines.push(...ing.split('\n').filter(Boolean))
     }
+    if (lines.length > 0) ingredientsByMeal.push({ title: meal.title, lines })
   }
 
-  if (allIngredients.length === 0) return { error: 'No ingredients found — make sure your meals have ingredients saved.' }
+  if (ingredientsByMeal.length === 0) return { error: 'No ingredients found — make sure your meals have ingredients saved.' }
 
-  // Use Claude to parse, deduplicate, and categorize
+  // Build the prompt with per-meal section headers so Claude can attribute each
+  // resulting grocery item back to its source meal(s). Titles are quoted in the
+  // header but echoed VERBATIM in the JSON output so we can match them later.
+  const mealSections = ingredientsByMeal
+    .map(m => `[Meal: ${m.title}]\n${m.lines.map(l => `- ${l}`).join('\n')}`)
+    .join('\n\n')
+  const knownTitles = ingredientsByMeal.map(m => m.title)
+
+  // Use Claude to parse, deduplicate, categorize, and attribute to source meals.
   const anthropic = new Anthropic()
   const message = await anthropic.messages.create({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 2048,
     messages: [{
       role: 'user',
-      content: `I have these raw ingredients from a weekly meal plan. Please:
-1. Parse and clean up each ingredient (fix formatting, normalize units)
-2. Combine duplicates or very similar ingredients (e.g. "1 onion" + "2 onions" = "3 onions")
-3. Assign each to the most appropriate grocery category
+      content: `Below are ingredients for a weekly meal plan, grouped by meal. Please:
+1. Parse and clean up each ingredient (fix formatting, normalize units).
+2. Combine duplicates or very similar ingredients across meals (e.g. "1 onion" in Meal A + "2 onions" in Meal B = "3 onions").
+3. Assign each to the most appropriate grocery category.
+4. For each output item, list which source meal(s) it came from in a "meals" array. Use the meal titles EXACTLY as they appear in the section headers.
 
 Return ONLY a valid JSON array, no explanation, no code fences:
 [
-  { "ingredient": "2 lbs ground beef", "category": "Meat & Seafood" },
+  { "ingredient": "3 onions", "category": "Produce", "meals": ["Chicken Tikka Masala", "Pad Thai"] },
   ...
 ]
 
@@ -111,19 +128,31 @@ Categories (pick the best fit, use exact names):
 - Condiments & Sauces
 - Other
 
-Ingredients to process:
-${allIngredients.join('\n')}`,
+Meal plan:
+${mealSections}`,
     }],
   })
 
   const raw = message.content[0].type === 'text' ? message.content[0].text : '[]'
   const jsonText = raw.replace(/^```(?:json)?\s*/m, '').replace(/\s*```\s*$/m, '').trim()
 
-  let parsed: Array<{ ingredient: string; category: string }>
+  let parsed: Array<{ ingredient: string; category: string; meals?: unknown }>
   try {
     parsed = JSON.parse(jsonText)
   } catch {
     return { error: 'Could not parse the grocery list. Try again.' }
+  }
+
+  // Normalize the meals attribution: drop anything that isn't a string, drop
+  // titles Claude hallucinated, and dedupe. Anything left becomes the row's
+  // `meals` text[]. Items with no recognized source still get persisted —
+  // they'll just bucket under "Other meal" in the by-meal view.
+  const knownSet = new Set(knownTitles)
+  const sanitizeMeals = (v: unknown): string[] => {
+    if (!Array.isArray(v)) return []
+    const out = new Set<string>()
+    for (const x of v) if (typeof x === 'string' && knownSet.has(x)) out.add(x)
+    return Array.from(out)
   }
 
   // Look up the plan's week_start_date
@@ -155,6 +184,7 @@ ${allIngredients.join('\n')}`,
       ingredient: item.ingredient,
       category: item.category ?? 'Other',
       position: i,
+      meals: sanitizeMeals(item.meals),
     }))
   )
 
@@ -220,6 +250,9 @@ ${rawText}`,
       ingredient: item.ingredient,
       category: item.category ?? 'Other',
       position: 9999 + i,
+      // Freeform items have no meal source — they bucket under "Added by hand"
+      // in the by-meal view.
+      meals: [] as string[],
     })))
     .select('*')
 
