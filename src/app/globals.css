@@ -59,7 +59,10 @@ body {
   font-family: var(--font-sans);
   font-size: var(--text-body);
   color: var(--color-ink);
-  background: #ffffff;
+  /* Matches every authenticated page's wrapper background and the AppFooter.
+     The comment in layout.tsx already assumed this; the value just wasn't set.
+     /login renders its own `bg-white` inner wrapper so it remains white-on-page. */
+  background: #F8FAFB;
   -webkit-font-smoothing: antialiased;
   /* Reserve space at the bottom for the mobile tab bar (md:hidden). On desktop
      this collapses to 0 via the media query above. */
