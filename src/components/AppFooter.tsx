@@ -22,14 +22,17 @@ export function AppFooter() {
         background: '#F8FAFB',
       }}
     >
-      cooked up by{' '}
+      WeeklyEats was cooked up by{' '}
       <a
         href="https://amandaa.me"
         target="_blank"
         rel="noopener noreferrer"
         style={{
           color: '#00A6A6',
-          textDecoration: 'none',
+          // Underline so it visually reads as a URL — without it the text
+          // looked like a colored phrase rather than a link.
+          textDecoration: 'underline',
+          textUnderlineOffset: '2px',
           fontWeight: 500,
         }}
       >
