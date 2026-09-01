@@ -255,6 +255,8 @@ h1, h2, h3, h4, h5, h6 {
   .tag-no-dairy    { background-color: var(--color-sky);          color: #075985; }
   .tag-gluten-free { background-color: var(--color-amber-light);  color: #92400e; }
   .tag-freeze      { background-color: var(--color-teal-light);   color: var(--color-teal-dark); }
+  .tag-breakfast   { background-color: #FEF9C3;                   color: #854D0E; }
+  .tag-lunch       { background-color: #DCFCE7;                   color: #166534; }
   .tag-snack       { background-color: var(--color-parchment);    color: #57534e; }
   .tag-salad       { background-color: #DCFCE7;                   color: #166534; }
   .tag-soup        { background-color: var(--color-orange-light);  color: #c2410c; }

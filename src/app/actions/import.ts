@@ -130,43 +130,55 @@ ${text}`,
   return parseRecipeJson(jsonText, 'from this URL')
 }
 
+const MAX_IMAGES = 5
+
 export async function parseRecipeFromImage(formData: FormData): Promise<ImportResult> {
   const authError = await requireUser()
   if (authError) return authError
 
-  // Take the file from FormData rather than a base64 string arg. Server Actions
+  // Take the files from FormData rather than base64 string args. Server Actions
   // encode plain string arguments through React's Flight protocol, which chokes
   // on multi-MB strings ("Maximum array nesting exceeded"). FormData/File is
   // streamed as a raw blob and bypasses Flight encoding entirely.
-  const file = formData.get('image')
-  if (!(file instanceof File) || file.size === 0) {
-    return { error: 'No image was uploaded.' }
+  const files = formData.getAll('image').filter((f): f is File => f instanceof File && f.size > 0)
+  if (files.length === 0) {
+    return { error: 'No images were uploaded.' }
   }
-  const ALLOWED = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
-  if (!ALLOWED.has(file.type)) {
-    return { error: 'Unsupported image format. Use JPG, PNG, GIF, or WEBP.' }
+  if (files.length > MAX_IMAGES) {
+    return { error: `Please upload at most ${MAX_IMAGES} photos at a time.` }
   }
-  const mediaType = file.type as ImageMediaType
-  const buffer = await file.arrayBuffer()
-  const base64 = Buffer.from(buffer).toString('base64')
-  console.log(`[parseRecipeFromImage] received ${file.size} bytes, type=${file.type}`)
 
+  const ALLOWED = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
+  const images: { mediaType: ImageMediaType; base64: string }[] = []
+  for (const file of files) {
+    if (!ALLOWED.has(file.type)) {
+      return { error: 'Unsupported image format. Use JPG, PNG, GIF, or WEBP.' }
+    }
+    const buffer = await file.arrayBuffer()
+    images.push({ mediaType: file.type as ImageMediaType, base64: Buffer.from(buffer).toString('base64') })
+  }
+  console.log(`[parseRecipeFromImage] received ${files.length} image(s), sizes=${files.map(f => f.size).join(',')}`)
+
+  const multiplePages = images.length > 1
   const anthropic = new Anthropic()
   const message = await anthropic.messages.create({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 2048,
-    system: `You transcribe recipes from images. You do not invent or guess content. If the image is unreadable, blurry, doesn't contain a recipe, or you cannot clearly read the ingredients/instructions, you must return {"error": "..."}. NEVER fill in plausible-looking placeholder content. Only transcribe text you can actually see.`,
+    system: `You transcribe recipes from images. You do not invent or guess content. If the image is unreadable, blurry, doesn't contain a recipe, or you cannot clearly read the ingredients/instructions, you must return {"error": "..."}. NEVER fill in plausible-looking placeholder content. Only transcribe text you can actually see. When multiple images are provided, treat them as multiple pages or parts of ONE recipe (e.g. a screenshot that didn't fit on one page) and combine them into a single result. If the images clearly show more than one distinct recipe, return {"error": "It looks like these photos show more than one recipe. Please import one recipe at a time."}`,
     messages: [
       {
         role: 'user',
         content: [
+          ...images.map(img => ({
+            type: 'image' as const,
+            source: { type: 'base64' as const, media_type: img.mediaType, data: img.base64 },
+          })),
           {
-            type: 'image',
-            source: { type: 'base64', media_type: mediaType, data: base64 },
-          },
-          {
-            type: 'text',
-            text: `Transcribe the recipe in this image. Cookbook page, screenshot, or handwritten card are all fine.
+            type: 'text' as const,
+            text: `${multiplePages
+              ? `Transcribe the recipe shown across these ${images.length} images. They are multiple pages/parts of the SAME recipe — combine them into one result.`
+              : 'Transcribe the recipe in this image.'
+            } Cookbook page, screenshot, or handwritten card are all fine.
 
 Return ONLY valid JSON. No explanation, no code fences.
 
@@ -177,15 +189,15 @@ If you can clearly read the recipe, return:
   "instructions": ["Brown the beef over medium heat.", "Add garlic and cook 1 min.", ...]
 }
 
-If you cannot clearly read it, the image isn't a recipe, or any field would have to be guessed, return:
+If you cannot clearly read it, the image(s) aren't a recipe, or any field would have to be guessed, return:
 { "error": "Could not read a recipe from this image" }
 
 Strict rules:
-- Transcribe what you actually see. Do NOT fill in typical or expected ingredients that aren't visible in the image.
+- Transcribe what you actually see. Do NOT fill in typical or expected ingredients that aren't visible in the image(s).
 - Each ingredient: quantity + unit + name on its own line, exactly as written in the image (just clean up formatting).
 - Each instruction: one step per array entry, starting with a verb.
 - For handwritten text, transcribe as best you can — but if you can't read a section, return the error rather than guessing.
-- If the image only shows part of a recipe (e.g. ingredients but no instructions), still return the error.`,
+- If the image(s) only show part of a recipe (e.g. ingredients but no instructions), still return the error.${multiplePages ? '\n- If the images show more than one distinct recipe rather than multiple pages of the same one, return the "more than one recipe" error above.' : ''}`,
           },
         ],
       },
@@ -195,14 +207,14 @@ Strict rules:
   const raw = message.content[0].type === 'text' ? message.content[0].text : ''
   const jsonText = raw.replace(/^```(?:json)?\s*/m, '').replace(/\s*```\s*$/m, '').trim()
   console.log(`[parseRecipeFromImage] claude raw response (first 500 chars): ${raw.slice(0, 500)}`)
-  return parseRecipeJson(jsonText, 'from this image')
+  return parseRecipeJson(jsonText, images.length > 1 ? 'from these images' : 'from this image')
 }
 
 // ─── Bulk import: fetch, parse, and save in one shot ─────────────────────────
 
 export type BulkImportResult = { title: string } | { error: string }
 
-export async function importMealFromUrl(url: string): Promise<BulkImportResult> {
+export async function importMealFromUrl(url: string, isPublic = false): Promise<BulkImportResult> {
   const authError = await requireUser()
   if (authError) return authError
 
@@ -268,7 +280,7 @@ ${pageText}`,
     ingredients: parsed.ingredients ?? [],
     instructions: (parsed.instructions ?? []).join('\n'),
     tags: null,
-    is_public: false,
+    is_public: isPublic,
   })
 
   if (dbError) return { error: dbError.message }
