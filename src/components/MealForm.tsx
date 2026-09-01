@@ -60,7 +60,7 @@ export function MealForm({
   const [notes, setNotes] = useState(initialNotes)
   const [isPublic, setIsPublic] = useState(initialIsPublic)
   const [importError, setImportError] = useState('')
-  const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [photoFiles, setPhotoFiles] = useState<File[]>([])
   const [photoError, setPhotoError] = useState('')
   const [isPending, startTransition] = useTransition()
   const [isPhotoPending, startPhotoTransition] = useTransition()
@@ -96,17 +96,32 @@ export function MealForm({
     return blob
   }
 
+  const MAX_PHOTOS = 5
+
+  function addPhotos(files: FileList | null) {
+    if (!files || files.length === 0) return
+    setPhotoFiles(prev => [...prev, ...Array.from(files)].slice(0, MAX_PHOTOS))
+    setPhotoError('')
+  }
+
+  function removePhoto(index: number) {
+    setPhotoFiles(prev => prev.filter((_, i) => i !== index))
+    setPhotoError('')
+  }
+
   function handlePhotoImport() {
-    if (!photoFile) return
+    if (photoFiles.length === 0) return
     setPhotoError('')
     startPhotoTransition(async () => {
       try {
-        const blob = await prepareImage(photoFile)
         // Server actions encode plain string args via Flight, which choked on
-        // multi-MB base64 payloads. FormData streams the file as a raw blob and
+        // multi-MB base64 payloads. FormData streams each file as a raw blob and
         // bypasses Flight encoding entirely.
         const fd = new FormData()
-        fd.append('image', blob, 'recipe.jpg')
+        for (const [i, file] of photoFiles.entries()) {
+          const blob = await prepareImage(file)
+          fd.append('image', blob, `recipe-${i}.jpg`)
+        }
         const result = await parseRecipeFromImage(fd)
         if ('error' in result) {
           setPhotoError(result.error)
@@ -116,7 +131,7 @@ export function MealForm({
           setInstructions(result.instructions)
         }
       } catch (e) {
-        setPhotoError(e instanceof Error ? e.message : 'Something went wrong reading that image. Try a different photo.')
+        setPhotoError(e instanceof Error ? e.message : 'Something went wrong reading those photos. Try again.')
       }
     })
   }
@@ -181,6 +196,9 @@ export function MealForm({
 
             <div>
               <label className="label block mb-2">Import from photo</label>
+              <p className="mb-2" style={{ fontSize: '0.8125rem', color: '#94A3B8' }}>
+                You can add multiple photos of the same recipe — handy if it didn&rsquo;t fit in one screenshot. Just keep it to one recipe per import.
+              </p>
               <div className="flex gap-2">
                 <label
                   className="input flex items-center gap-2 cursor-pointer"
@@ -189,28 +207,52 @@ export function MealForm({
                   <input
                     type="file"
                     accept="image/jpeg,image/png,image/webp,image/gif"
+                    multiple
                     className="sr-only"
-                    onChange={e => { setPhotoFile(e.target.files?.[0] ?? null); setPhotoError('') }}
+                    onChange={e => { addPhotos(e.target.files); e.target.value = '' }}
                   />
-                  <span style={{ color: photoFile ? '#1A1A1A' : '#94A3B8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {photoFile ? photoFile.name : 'Choose image…'}
+                  <span style={{ color: photoFiles.length ? '#1A1A1A' : '#94A3B8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {photoFiles.length
+                      ? `${photoFiles.length} photo${photoFiles.length > 1 ? 's' : ''} selected`
+                      : 'Choose images…'}
                   </span>
                 </label>
                 <button
                   type="button"
                   onClick={handlePhotoImport}
-                  disabled={!photoFile || isPhotoPending}
+                  disabled={photoFiles.length === 0 || isPhotoPending}
                   className="btn-secondary"
                   style={{ padding: '10px 16px', fontSize: '0.875rem', whiteSpace: 'nowrap', flexShrink: 0 }}
                 >
                   {isPhotoPending ? 'Reading…' : 'Import'}
                 </button>
               </div>
+              {photoFiles.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {photoFiles.map((file, i) => (
+                    <button
+                      key={`${file.name}-${i}`}
+                      type="button"
+                      onClick={() => removePhoto(i)}
+                      className="tag"
+                      style={{ cursor: 'pointer' }}
+                      title="Click to remove"
+                    >
+                      {file.name} ×
+                    </button>
+                  ))}
+                </div>
+              )}
+              {photoFiles.length >= MAX_PHOTOS && (
+                <p className="mt-2 text-sm" style={{ color: '#94A3B8' }}>Up to {MAX_PHOTOS} photos per import.</p>
+              )}
               {photoError && (
                 <p className="mt-2 text-sm" style={{ color: '#991B1B' }}>{photoError}</p>
               )}
               {isPhotoPending && (
-                <p className="mt-2 text-sm" style={{ color: '#00A6A6' }}>Reading recipe from photo…</p>
+                <p className="mt-2 text-sm" style={{ color: '#00A6A6' }}>
+                  Reading recipe from {photoFiles.length > 1 ? 'photos' : 'photo'}…
+                </p>
               )}
             </div>
 
