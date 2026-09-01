@@ -16,7 +16,7 @@ export function MarketingHeader() {
             Inside the app
           </a>
           <a
-            href="#start"
+            href="https://mealplanner.amandaa.me/login"
             className="font-sans text-sm font-semibold text-white no-underline rounded-full px-[18px] py-[9px]"
             style={{ background: 'var(--color-ink)' }}
           >
