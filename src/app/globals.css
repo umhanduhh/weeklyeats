@@ -17,6 +17,7 @@
 
   --font-serif: Georgia, "Times New Roman", serif;
   --font-sans:  system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono:  "SF Mono", ui-monospace, Menlo, monospace;
 
   --text-display: 2rem;
   --text-h1:      1.5rem;
@@ -372,4 +373,20 @@ h1, h2, h3, h4, h5, h6 {
     background-position: center;
     background-size: 10px;
   }
+}
+
+/* ─── Marketing homepage motion ──────────────────────────────────────────── */
+/* Used by the looping product demos on the public homepage (src/components/marketing).
+   Kept outside @layer components so specificity isn't affected by Tailwind's layering. */
+@keyframes weFadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes weRise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes weBlink { 50% { opacity: 0; } }
+
+.we-fade-in { animation: weFadeIn .35s ease both; }
+.we-fade-in-fast { animation: weFadeIn .3s ease both; }
+.we-rise { animation: weRise .35s ease both; }
+.we-blink { animation: weBlink 1s steps(2) infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .we-fade-in, .we-fade-in-fast, .we-rise, .we-blink { animation: none; }
 }
